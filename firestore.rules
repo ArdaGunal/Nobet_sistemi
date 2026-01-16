@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Yardımcı fonksiyonlar
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isSuperAdmin() {
+      return isSignedIn() && getUserData().role == 'super_admin';
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (getUserData().role == 'admin' || getUserData().role == 'super_admin');
+    }
+
+    // Users koleksiyonu kuralları
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if request.auth.uid == userId;
+      allow update: if isSuperAdmin() 
+                    || (isAdmin() && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])))
+                    || request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
+    // Shifts
+    match /shifts/{shiftId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    // Shift Requests (vardiya istekleri)
+    match /shiftRequests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Schedule (vardiya atamaları)
+    match /schedule/{assignmentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Announcements (duyurular)
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+      // Allow update if admin OR if regular user is just marking as read (title/content/priority don't change)
+      allow update: if isAdmin() || (isSignedIn() && 
+        request.resource.data.title == resource.data.title && 
+        request.resource.data.content == resource.data.content &&
+        request.resource.data.priority == resource.data.priority
+      );
+    }
+
+    // === CHAT SİSTEMİ ===
+    
+    // Sohbet Odaları
+    match /chats/{roomId} {
+      // Okuma: Adminler herkesi, Kullanıcılar sadece kendi odasını okuyabilir
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == roomId);
+      
+      // Yazma/Oluşturma: Herkes (Service tarafında ID kontrolü yapılıyor ama burada da sıkarız)
+      // Kullanıcılar kendi ID'leriyle oda oluşturabilir/güncelleyebilir
+      allow create, update: if isSignedIn() && (isAdmin() || request.auth.uid == roomId);
+      allow delete: if isAdmin();
+      
+      // Mesajlar Alt Koleksiyonu
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (isAdmin() || request.auth.uid == roomId);
+        allow create: if isSignedIn() && (isAdmin() || request.auth.uid == roomId);
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+/**
+ * Employee Group Layout
+ */
+
+import { Stack } from 'expo-router';
+
+export default function EmployeeLayout() {
+    return (
+        <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="request" />
+        </Stack>
+    );
+}
