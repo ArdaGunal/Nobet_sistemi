@@ -206,10 +206,12 @@ export default function DashboardScreen() {
 
         return (
             <Surface key={slotId} style={styles.slotCard} elevation={1}>
-                <View style={[styles.slotHeader, { backgroundColor: slot.color }]}>
-                    {getSlotIcon(slotId, '#fff')}
-                    <Text style={styles.slotTitle}>{slot.labelTr}</Text>
-                    <Text style={styles.slotTime}>{slotId}</Text>
+                <View style={[styles.slotHeader, { backgroundColor: slot.color, justifyContent: 'space-between' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {getSlotIcon(slotId, '#fff')}
+                        <Text style={styles.slotTitle}>{slot.labelTr} ({slotId})</Text>
+                    </View>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }}>{slotAssignments.length} Personel</Text>
                 </View>
 
                 <View style={styles.slotContent}>
@@ -256,29 +258,30 @@ export default function DashboardScreen() {
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                     }
+                    ListFooterComponent={
+                        <View style={{ padding: 16, backgroundColor: '#fff', marginTop: 8, marginBottom: 24, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' }}>
+                            <Text variant="titleMedium" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
+                                Toplam Personel: {filteredAssignments.length}
+                            </Text>
+                            <View style={[styles.roleSummary, { justifyContent: 'center', marginTop: 8 }]}>
+                                {STAFF_ROLES.map(role => {
+                                    const count = filteredAssignments.filter(a => a.staffRole === role.id).length;
+                                    return count > 0 ? (
+                                        <Chip
+                                            key={role.id}
+                                            compact
+                                            style={[styles.summaryChip, { backgroundColor: role.color }]}
+                                            textStyle={{ color: '#fff', fontSize: 11 }}
+                                        >
+                                            {count} {role.labelTr}
+                                        </Chip>
+                                    ) : null;
+                                })}
+                            </View>
+                        </View>
+                    }
                     ListHeaderComponent={
                         <>
-                            <View style={styles.summaryBar}>
-                                <Text variant="labelMedium" style={{ color: '#6b7280' }}>
-                                    Toplam: {filteredAssignments.length} personel
-                                </Text>
-                                <View style={styles.roleSummary}>
-                                    {STAFF_ROLES.map(role => {
-                                        const count = filteredAssignments.filter(a => a.staffRole === role.id).length;
-                                        return count > 0 ? (
-                                            <Chip
-                                                key={role.id}
-                                                compact
-                                                style={[styles.summaryChip, { backgroundColor: role.color }]}
-                                                textStyle={{ color: '#fff', fontSize: 11 }}
-                                            >
-                                                {count} {role.labelTr}
-                                            </Chip>
-                                        ) : null;
-                                    })}
-                                </View>
-                            </View>
-
                             {/* User's Pending Requests */}
                             {myRequests.length > 0 && (
                                 <Surface style={styles.pendingRequestsCard} elevation={1}>
