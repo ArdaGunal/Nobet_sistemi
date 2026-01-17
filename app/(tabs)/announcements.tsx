@@ -157,16 +157,18 @@ export default function AnnouncementsScreen() {
                             {!isRead && (
                                 <>
                                     <Chip compact style={{ marginRight: 4, height: 24, backgroundColor: theme.colors.primaryContainer }} textStyle={{ fontSize: 10, lineHeight: 12 }}>Yeni</Chip>
-                                    <IconButton
+                                    <Chip
+                                        compact
                                         icon="check"
-                                        size={18}
-                                        onPress={(e) => {
-                                            e.stopPropagation();
+                                        style={{ height: 24, backgroundColor: '#dcfce7', marginRight: 4 }}
+                                        textStyle={{ fontSize: 10, lineHeight: 12, color: '#16a34a' }}
+                                        onPress={(e: any) => {
+                                            e?.stopPropagation?.();
                                             user && markAnnouncementAsRead(item.id, user.id);
                                         }}
-                                        iconColor="#22c55e"
-                                        style={{ margin: 0, marginRight: 4 }}
-                                    />
+                                    >
+                                        Okundu
+                                    </Chip>
                                 </>
                             )}
                             {isAdmin && !isPersonalNotification && (
