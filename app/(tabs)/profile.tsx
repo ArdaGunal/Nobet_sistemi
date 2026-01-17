@@ -9,6 +9,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, Avatar, List, useTheme, Divider, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { STAFF_ROLES } from '@/src/types';
 
 export default function ProfileScreen() {
     const { user, logout } = useAuth();
@@ -35,26 +36,30 @@ export default function ProfileScreen() {
                     <Text variant="headlineSmall" style={styles.name}>
                         {user?.fullName}
                     </Text>
-                    <Text variant="bodyMedium" style={{ color: theme.colors.secondary }}>
+                    <Text variant="bodyMedium" style={{ color: theme.colors.secondary, marginBottom: 8 }}>
                         {user?.email}
                     </Text>
-                    <View style={[styles.badge, { backgroundColor: theme.colors.secondaryContainer }]}>
-                        <Text variant="labelSmall" style={{ color: theme.colors.onSecondaryContainer }}>
-                            {user?.role === 'admin' ? 'Yönetici' : 'Personel'}
-                        </Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={[styles.badge, { backgroundColor: theme.colors.secondaryContainer }]}>
+                            <Text variant="labelSmall" style={{ color: theme.colors.onSecondaryContainer }}>
+                                {user?.role === 'admin' ? 'Yönetici' : 'Personel'}
+                            </Text>
+                        </View>
+                        {user?.staffRole && (
+                            <View style={[styles.badge, { backgroundColor: STAFF_ROLES.find(r => r.id === user.staffRole)?.color || '#6b7280' }]}>
+                                <Text variant="labelSmall" style={{ color: 'white' }}>
+                                    {STAFF_ROLES.find(r => r.id === user.staffRole)?.labelTr}
+                                </Text>
+                            </View>
+                        )}
                     </View>
                 </Surface>
 
                 <List.Section style={styles.section}>
                     <List.Subheader>Hesap Ayarları</List.Subheader>
                     <List.Item
-                        title="Profil Bilgileri"
-                        left={(props) => <List.Icon {...props} icon="account" />}
-                        right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                        onPress={() => { }}
-                    />
-                    <List.Item
                         title="Bildirimler"
+                        description="Açık / Titreşim / Kapalı"
                         left={(props) => <List.Icon {...props} icon="bell" />}
                         right={(props) => <List.Icon {...props} icon="chevron-right" />}
                         onPress={() => { }}
@@ -62,9 +67,9 @@ export default function ProfileScreen() {
                     <Divider />
                     <List.Item
                         title="Uygulama Hakkında"
+                        description="Nöbet Takip Sistemi v1.0. Acil Servis çalışanları için özel olarak geliştirilmiştir."
                         left={(props) => <List.Icon {...props} icon="information" />}
-                        right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                        onPress={() => { }}
+                        onPress={() => alert('Nöbet Takip Sistemi\nGeliştirici: Arda Günal\nVersiyon: 1.0.0')}
                     />
                 </List.Section>
 
