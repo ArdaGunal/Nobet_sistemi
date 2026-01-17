@@ -10,6 +10,7 @@ import { subscribeToUsers } from '@/src/services/userService';
 import { subscribeToUnreadCount } from '@/src/services/chatService';
 import { subscribeToPendingRequests } from '@/src/services/requestService';
 import { subscribeToAnnouncements } from '@/src/services/announcementService';
+import { subscribeToSwapRequests } from '@/src/services/swapService';
 import { Announcement } from '@/src/types';
 
 // Badge component for drawer icons
@@ -73,6 +74,8 @@ export default function DrawerLayout() {
     const drawerWidth = 280;
 
     const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+    const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
+    const [pendingSwaps, setPendingSwaps] = useState(0);
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
 
@@ -80,27 +83,14 @@ export default function DrawerLayout() {
     const [snackbarVisible, setSnackbarVisible] = useState(false);
     const [lastAnnouncementTitle, setLastAnnouncementTitle] = useState('');
 
-    // Calculate total notifications for the main badge
-    // We include unreadMessagesCount in the hamburger badge logic below, 
-    // but totalRequestsBadge variable is mainly for the 'Requests' tab badge.
+    // Calculate total notifications for the hamburger menu
+    const totalNotifications = unreadMessagesCount + unreadAnnouncements + pendingSwaps;
     const totalRequestsBadge = pendingRequestsCount;
 
     useEffect(() => {
         if (!user) return;
 
         // Chat notification
-        // Note: subscribeToUnreadCount might have different signature depending on version. 
-        // Based on chatService.ts, it takes (userId, userRole, callback) or (userId, callback)?
-        // Checking chatService.ts content from logs: 
-        // export const subscribeToUnreadCount = (userId, userRole, callback) => ...
-        // However, if strict typing is an issue or signature mismatch, we adapt.
-        // Assuming current file matches the service definition:
-
-        // If chatService uses (userId, setUnreadMessagesCount), use that.
-        // If it uses (userId, userRole, callback), use that.
-        // Based on previous logs, it seemed use (userId, setUnreadMessagesCount) in previous layout.
-        // I will try to use the safe one. If TS complains, I check service again.
-        // Actually I checked service in Step 3600, it is (userId, userRole, callback).
         const unsubChat = subscribeToUnreadCount(user.id, user.role || 'user', (count) => {
             setUnreadMessagesCount(count);
         });
@@ -113,21 +103,26 @@ export default function DrawerLayout() {
 
             if (unread.length > 0) {
                 const latest = unread[0];
-                // Show snackbar on first load OR if title changes (new announcement)
                 if (isFirstLoad || latest.title !== lastAnnouncementTitle) {
                     setLastAnnouncementTitle(latest.title);
-                    setSnackbarVisible(true);
+                    setUnreadAnnouncements(unread.length);
                 }
+            } else {
+                setUnreadAnnouncements(0);
             }
             isFirstLoad = false;
         });
 
+        // Subscribe to swap requests
+        const unsubscribeSwaps = subscribeToSwapRequests(user.id, (swaps) => {
+            const pending = swaps.filter(s => s.status === 'pending_user' && s.expiresAt > Date.now());
+            setPendingSwaps(pending.length);
+        });
+
         return () => {
-            // unsubscribe functions
             if (typeof unsubChat === 'function') unsubChat();
-            // subscribeToUnreadCount returns Unsubscribe
-            // subscribeToAnnouncements returns Unsubscribe
             unsubAnnounce();
+            unsubscribeSwaps();
         };
     }, [user, lastAnnouncementTitle]);
 
@@ -155,11 +150,7 @@ export default function DrawerLayout() {
                         fontWeight: 'bold',
                     },
                     headerLeft: () => {
-                        // Custom hamburger button with global badge
-                        // Red dot if ANY notification exists
-                        const hasNotifications = (isAdmin && totalRequestsBadge > 0)
-                            || unreadMessagesCount > 0
-                            || unreadAnnouncementsCount > 0;
+                        const hasNotifications = (isAdmin && totalRequestsBadge > 0) || totalNotifications > 0;
 
                         return (
                             <TouchableOpacity
@@ -206,9 +197,16 @@ export default function DrawerLayout() {
                 <Drawer.Screen
                     name="index"
                     options={{
-                        drawerLabel: 'Ana Sayfa',
+                        drawerLabel: pendingSwaps > 0 ? `Ana Sayfa (${pendingSwaps})` : 'Ana Sayfa',
                         title: 'Nöbet Listesi',
-                        drawerIcon: ({ color, size }) => <Home size={size} color={color} />,
+                        drawerIcon: ({ color, size }) => (
+                            <IconWithBadge
+                                icon={Home}
+                                color={color}
+                                size={size}
+                                badgeCount={pendingSwaps}
+                            />
+                        ),
                     }}
                 />
 
@@ -302,21 +300,22 @@ export default function DrawerLayout() {
             </Drawer>
 
             <Snackbar
-                visible={snackbarVisible && unreadAnnouncementsCount > 0}
+                visible={snackbarVisible && (unreadAnnouncements > 0 || pendingSwaps > 0)}
                 onDismiss={() => setSnackbarVisible(false)}
                 duration={5000}
                 action={{
-                    label: 'Oku',
+                    label: 'Görüntüle',
                     onPress: () => {
-                        router.push('/announcements');
+                        // Eğer swap ise dashboard'a, duyuru ise duyurulara yönlendir
+                        if (pendingSwaps > 0) router.push('/(tabs)/');
+                        else router.push('/(tabs)/announcements');
                         setSnackbarVisible(false);
                     },
                 }}
                 style={{ backgroundColor: '#1e293b', position: 'absolute', top: 60, left: 16, right: 16, zIndex: 99999, borderRadius: 8 }}
                 wrapperStyle={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 99999 }}
             >
-                <Text style={{ color: 'white', fontWeight: 'bold' }}>Yeni Duyuru: </Text>
-                <Text style={{ color: 'white' }}>{lastAnnouncementTitle}</Text>
+                {pendingSwaps > 0 ? 'Yeni Vardiya Takas İsteğiniz Var!' : (lastAnnouncementTitle ? `Yeni Duyuru: ${lastAnnouncementTitle}` : 'Yeni bildiriminiz var')}
             </Snackbar>
         </>
     );

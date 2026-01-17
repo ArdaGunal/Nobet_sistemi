@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, StyleSheet, FlatList, Alert, Platform, TouchableOpacity } from 'react-native';
 import {
     Text,
     Surface,
@@ -17,6 +17,8 @@ import {
     Divider,
     Portal,
     Modal,
+    Dialog,
+    Paragraph,
     TextInput,
     SegmentedButtons,
     RadioButton
@@ -24,15 +26,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { SwapRequestList } from '@/src/components/admin/SwapRequestList'; // New Component
 
 import { useAuth } from '@/context/AuthContext';
-import { ShiftRequest, REQUEST_TYPES, STAFF_ROLES, User, StaffRole, RotationGroup } from '@/src/types';
+import { ShiftRequest, REQUEST_TYPES, STAFF_ROLES, User, StaffRole, RotationGroup, SHIFT_SLOTS } from '@/src/types';
 import { subscribeToPendingRequests, updateRequestStatus } from '@/src/services/requestService';
 import { subscribeToUsers, approveUser, deleteUser } from '@/src/services/userService';
 import { findAssignment, deleteShiftAssignment, createShiftAssignment } from '@/src/services/scheduleService';
 import { AppTooltip } from '@/src/components';
 
-type TabValue = 'shift_requests' | 'user_requests';
+import { subscribeToAdminSwapRequests, approveSwapByAdmin, rejectSwapByAdmin } from '@/src/services/swapService';
+import { SwapRequest } from '@/src/types';
+
+type TabValue = 'shift_requests' | 'user_requests' | 'swap_requests';
 
 export default function RequestsScreen() {
     const theme = useTheme();
@@ -49,6 +55,10 @@ export default function RequestsScreen() {
     const pendingUsers = users.filter(u => !u.isApproved && u.role === 'user');
     const [loadingUsers, setLoadingUsers] = useState(true);
 
+    // Swap Requests State - Removed, managed by SwapRequestList component
+    // const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
+    // const [loadingSwaps, setLoadingSwaps] = useState(true);
+
     // Shift Response Modal
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<ShiftRequest | null>(null);
@@ -60,7 +70,11 @@ export default function RequestsScreen() {
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [selectedStaffRole, setSelectedStaffRole] = useState<StaffRole>('saglikci');
     const [selectedRotationGroup, setSelectedRotationGroup] = useState<RotationGroup>('A');
+
     const [approving, setApproving] = useState(false);
+
+
+    // const [processingSwap, setProcessingSwap] = useState(false); // Removed
 
     useEffect(() => {
         const unsubscribeRequests = subscribeToPendingRequests(
@@ -85,9 +99,16 @@ export default function RequestsScreen() {
             }
         );
 
+        // Swap subscription removed
+        // const unsubscribeSwaps = subscribeToAdminSwapRequests((data) => {
+        //     setSwapRequests(data);
+        //     setLoadingSwaps(false);
+        // });
+
         return () => {
             unsubscribeRequests();
             unsubscribeUsers();
+            // unsubscribeSwaps(); // Removed
         };
     }, []);
 
@@ -217,12 +238,16 @@ export default function RequestsScreen() {
         );
     }
 
+    // --- SWAP REQUEST HANDLERS (REMOVED) ---
+    // The old swap handlers and render logic have been removed.
+    // The SwapRequestList component now handles this functionality.
+
     const renderShiftRequest = ({ item }: { item: ShiftRequest }) => {
         const typeInfo = getRequestTypeInfo(item.type);
         const roleInfo = getStaffRoleInfo(item.userStaffRole);
 
         return (
-            <Surface style={styles.card} elevation={1}>
+            <View style={styles.card}>
                 <View style={styles.cardHeader}>
                     <View style={styles.userInfo}>
                         <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
@@ -335,13 +360,13 @@ export default function RequestsScreen() {
                         </Button>
                     </AppTooltip>
                 </View>
-            </Surface>
+            </View>
         );
     };
 
     const renderPendingUser = ({ item }: { item: User }) => {
         return (
-            <Surface style={styles.userCard} elevation={1}>
+            <View style={styles.userCard}>
                 <View style={styles.userInfo}>
                     <Text variant="titleMedium" style={{ fontWeight: '600' }}>
                         {item.fullName}
@@ -377,12 +402,12 @@ export default function RequestsScreen() {
                         />
                     </AppTooltip>
                 </View>
-            </Surface>
+            </View>
         );
     };
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
                     İstekler
@@ -399,17 +424,11 @@ export default function RequestsScreen() {
                     value={activeTab}
                     onValueChange={(value) => setActiveTab(value as TabValue)}
                     buttons={[
-                        {
-                            value: 'shift_requests',
-                            label: `Vardiya (${requests.length})`,
-                            icon: 'calendar-clock',
-                        },
-                        {
-                            value: 'user_requests',
-                            label: `Kayıt (${pendingUsers.length})`,
-                            icon: 'account-plus',
-                        },
+                        { value: 'shift_requests', label: 'İzin/Vardiya' },
+                        { value: 'user_requests', label: `Kayıt (${pendingUsers.length})` },
+                        { value: 'swap_requests', label: 'Takas' },
                     ]}
+                    style={{ marginBottom: 16 }}
                 />
             </View>
 
@@ -419,6 +438,12 @@ export default function RequestsScreen() {
                 </View>
             ) : (
                 <>
+                    {/* SWAP REQUESTS (NEW COMPONENT) */}
+                    {activeTab === 'swap_requests' && (
+                        <SwapRequestList />
+                    )}
+
+                    {/* SHIFT REQUESTS (LEGACY) */}
                     {activeTab === 'shift_requests' && (
                         requests.length === 0 ? (
                             <View style={styles.emptyContainer}>
@@ -437,6 +462,7 @@ export default function RequestsScreen() {
                         )
                     )}
 
+                    {/* USER REQUESTS (LEGACY) */}
                     {activeTab === 'user_requests' && (
                         pendingUsers.length === 0 ? (
                             <View style={styles.emptyContainer}>
@@ -456,122 +482,7 @@ export default function RequestsScreen() {
                     )}
                 </>
             )}
-
-            {/* Shift Response Modal */}
-            <Portal>
-                <Modal visible={modalVisible} onDismiss={() => setModalVisible(false)} contentContainerStyle={styles.modalContent}>
-                    <Surface style={styles.modalSurface}>
-                        <Text variant="titleLarge" style={{ marginBottom: 16 }}>
-                            İstek Yanıtı
-                        </Text>
-
-                        <TextInput
-                            mode="outlined"
-                            label="Yanıt Mesajı (Opsiyonel)"
-                            value={adminResponse}
-                            onChangeText={setAdminResponse}
-                            multiline
-                            numberOfLines={3}
-                            style={{ marginBottom: 16 }}
-                        />
-
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <Button
-                                mode="outlined"
-                                textColor={theme.colors.error}
-                                onPress={() => handleResponse('rejected')}
-                                loading={responding}
-                                style={{ flex: 1 }}
-                            >
-                                Reddet
-                            </Button>
-                            <Button
-                                mode="contained"
-                                onPress={() => handleResponse('approved')}
-                                loading={responding}
-                                style={{ flex: 1 }}
-                            >
-                                Onayla
-                            </Button>
-                        </View>
-                    </Surface>
-                </Modal>
-            </Portal>
-
-            {/* User Approval Modal */}
-            <Portal>
-                <Modal
-                    visible={approvalModalVisible}
-                    onDismiss={() => setApprovalModalVisible(false)}
-                    contentContainerStyle={[styles.modalSurface, { margin: 20 }]}
-                >
-                    <Text variant="titleLarge" style={{ fontWeight: 'bold', marginBottom: 16 }}>
-                        Kullanıcıyı Onayla
-                    </Text>
-
-                    {selectedUser && (
-                        <View style={styles.userPreview}>
-                            <Text variant="titleMedium">{selectedUser.fullName}</Text>
-                            <Text variant="bodySmall" style={{ color: theme.colors.secondary }}>
-                                {selectedUser.email}
-                            </Text>
-                        </View>
-                    )}
-
-                    <Divider style={{ marginVertical: 16 }} />
-
-                    <Text variant="labelLarge" style={{ marginBottom: 8 }}>
-                        Meslek Seçin
-                    </Text>
-                    <RadioButton.Group
-                        onValueChange={(value) => setSelectedStaffRole(value as StaffRole)}
-                        value={selectedStaffRole}
-                    >
-                        {STAFF_ROLES.map((role) => (
-                            <RadioButton.Item
-                                key={role.id}
-                                label={role.labelTr}
-                                value={role.id}
-                                style={styles.radioItem}
-                            />
-                        ))}
-                    </RadioButton.Group>
-
-                    <Divider style={{ marginVertical: 16 }} />
-
-                    <Text variant="labelLarge" style={{ marginBottom: 8 }}>
-                        Rotasyon Grubu
-                    </Text>
-                    <SegmentedButtons
-                        value={selectedRotationGroup}
-                        onValueChange={(value) => setSelectedRotationGroup(value as RotationGroup)}
-                        buttons={[
-                            { value: 'A', label: 'Grup A' },
-                            { value: 'B', label: 'Grup B' },
-                            { value: 'C', label: 'Grup C' },
-                        ]}
-                    />
-
-                    <View style={styles.modalActions}>
-                        <Button
-                            mode="outlined"
-                            onPress={() => setApprovalModalVisible(false)}
-                            style={{ flex: 1 }}
-                        >
-                            İptal
-                        </Button>
-                        <Button
-                            mode="contained"
-                            onPress={handleApproveUser}
-                            loading={approving}
-                            style={{ flex: 1, backgroundColor: '#22c55e' }}
-                        >
-                            Onayla
-                        </Button>
-                    </View>
-                </Modal>
-            </Portal>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -673,6 +584,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         marginTop: 24,
+    },
+    actionButton: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 999,
+        cursor: 'pointer'
     },
     statusChip: {
         alignSelf: 'flex-start',

@@ -62,6 +62,20 @@ service cloud.firestore {
       );
     }
 
+    // Swap Requests
+    match /swap_requests/{requestId} {
+      // Herkes okuyabilir (gerekirse kısıtlanabilir ama client-side filtre yetiyor şimdilik)
+      allow read: if isSignedIn();
+      // Oluşturma: Sadece kendi adına
+      allow create: if isSignedIn() && request.resource.data.requesterId == request.auth.uid;
+      // Güncelleme: Admin, Hedef Kullanıcı (Kabul/Red) veya İsteyen (İptal)
+      allow update: if isAdmin() || (isSignedIn() && (
+        resource.data.targetUserId == request.auth.uid || 
+        resource.data.requesterId == request.auth.uid
+      ));
+      allow delete: if isAdmin();
+    }
+
     // === CHAT SİSTEMİ ===
     
     // Sohbet Odaları

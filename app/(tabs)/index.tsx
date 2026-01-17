@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, ScrollView, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, ScrollView, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { Text, useTheme, Surface, ActivityIndicator, FAB, Chip, Portal, Modal, Button, TextInput, SegmentedButtons } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, startOfMonth, endOfMonth, addDays, subDays, addMonths, subMonths } from 'date-fns';
@@ -22,6 +22,9 @@ import { useAuth } from '@/context/AuthContext';
 
 import { useRouter } from 'expo-router';
 import { subscribeToAnnouncements } from '@/src/services/announcementService';
+import { createSwapRequest, subscribeToSwapRequests } from '@/src/services/swapService';
+import { SwapRequest } from '@/src/types';
+import { SwapRequestCard } from '@/src/components/SwapRequestCard';
 
 export default function DashboardScreen() {
     const theme = useTheme();
@@ -40,13 +43,16 @@ export default function DashboardScreen() {
     const [requestModalVisible, setRequestModalVisible] = useState(false);
     const [modalStep, setModalStep] = useState<'select' | 'action'>('select');
     const [selectedShift, setSelectedShift] = useState<ShiftAssignment | null>(null);
-    const [requestType, setRequestType] = useState<'move' | 'cancel'>('cancel');
+    const [requestType, setRequestType] = useState<'move' | 'cancel' | 'swap'>('cancel');
+    const [swapTargetShift, setSwapTargetShift] = useState<ShiftAssignment | null>(null);
+    const [availableSwapShifts, setAvailableSwapShifts] = useState<ShiftAssignment[]>([]);
     const [targetDate, setTargetDate] = useState<Date>(new Date());
     const [requestMessage, setRequestMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     // User's pending requests
     const [myRequests, setMyRequests] = useState<ShiftRequest[]>([]);
+    const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
 
     // Get date range for subscription (current month)
     const monthStart = useMemo(() => format(startOfMonth(selectedDate), 'yyyy-MM-dd'), [selectedDate]);
@@ -92,6 +98,16 @@ export default function DashboardScreen() {
             setMyRequests(requests.filter(r => r.type === 'preference' && r.status === 'pending'));
         });
 
+        return () => unsubscribe();
+    }, [user]);
+
+    // Subscribe to incoming swap requests
+    useEffect(() => {
+        if (!user) return;
+        const unsubscribe = subscribeToSwapRequests(user.id, (data) => {
+            const pending = data.filter(r => r.status === 'pending_user' && r.expiresAt > Date.now());
+            setSwapRequests(pending);
+        });
         return () => unsubscribe();
     }, [user]);
 
@@ -147,6 +163,24 @@ export default function DashboardScreen() {
             .sort((a, b) => a.date.localeCompare(b.date) || a.shiftSlot.localeCompare(b.shiftSlot));
     }, [assignments, user]);
 
+    // Calculate available swap shifts when in swap mode
+    useEffect(() => {
+        if (requestType !== 'swap' || !user?.staffRole) return;
+
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const potential = assignments.filter(a =>
+            a.date === dateStr &&
+            a.staffRole === user.staffRole &&
+            a.userId !== user.id
+        );
+        setAvailableSwapShifts(potential);
+
+        // Reset target selection if list changes and selected isn't in it
+        if (swapTargetShift && !potential.find(p => p.id === swapTargetShift.id)) {
+            setSwapTargetShift(null);
+        }
+    }, [requestType, targetDate, assignments, user, swapTargetShift]);
+
     // Request Modal Functions
     const openRequestModal = () => {
         setModalStep('select');
@@ -173,21 +207,49 @@ export default function DashboardScreen() {
 
             if (requestType === 'cancel') {
                 message = `${format(new Date(selectedShift.date), 'd MMMM', { locale: tr })} ${slotLabel} vardiyamı iptal etmek istiyorum${requestMessage ? '. Sebep: ' + requestMessage : ''}`;
-            } else {
-                message = `${format(new Date(selectedShift.date), 'd MMMM', { locale: tr })} ${slotLabel} vardiyamı ${format(targetDate, 'd MMMM', { locale: tr })} tarihine taşımak istiyorum${requestMessage ? '. Sebep: ' + requestMessage : ''}`;
-            }
 
-            await createRequest(
-                user.id,
-                user.fullName,
-                user.staffRole,
-                'preference',
-                selectedShift.date,
-                message,
-                action,
-                selectedShift.shiftSlot,
-                requestType === 'move' ? format(targetDate, 'yyyy-MM-dd') : undefined
-            );
+                await createRequest(
+                    user.id,
+                    user.fullName,
+                    user.staffRole,
+                    'preference',
+                    selectedShift.date,
+                    message,
+                    action,
+                    selectedShift.shiftSlot,
+                    undefined
+                );
+            } else if (requestType === 'move') {
+                message = `${format(new Date(selectedShift.date), 'd MMMM', { locale: tr })} ${slotLabel} vardiyamı ${format(targetDate, 'd MMMM', { locale: tr })} tarihine taşımak istiyorum${requestMessage ? '. Sebep: ' + requestMessage : ''}`;
+
+                await createRequest(
+                    user.id,
+                    user.fullName,
+                    user.staffRole,
+                    'preference',
+                    selectedShift.date,
+                    message,
+                    action,
+                    selectedShift.shiftSlot,
+                    format(targetDate, 'yyyy-MM-dd')
+                );
+            } else if (requestType === 'swap') {
+                if (!swapTargetShift) {
+                    alert('Lütfen takas yapacağınız kişiyi seçin.');
+                    setSubmitting(false);
+                    return;
+                }
+
+                // createSwapRequest already handles logic. 
+                // We pass minimal user info as expected by service.
+                // Assuming availableSwapShifts come from assignments which have userId and userName.
+                await createSwapRequest(
+                    { id: user.id, fullName: user.fullName },
+                    selectedShift,
+                    { id: swapTargetShift.userId, fullName: swapTargetShift.userName },
+                    swapTargetShift
+                );
+            }
             setRequestModalVisible(false);
         } catch (error: any) {
             console.error('Request failed:', error);
@@ -281,7 +343,32 @@ export default function DashboardScreen() {
                         </View>
                     }
                     ListHeaderComponent={
-                        <>
+                        <View>
+                            {/* Announcements Banner */}
+                            {/* Announcements Banner */}
+                            {user && unreadAnnouncementsCount > 0 && (
+                                <Surface style={{ margin: 16, marginBottom: 8, padding: 12, borderRadius: 8, backgroundColor: '#fef2f2', borderLeftWidth: 4, borderLeftColor: '#ef4444' }} elevation={2}>
+                                    <TouchableOpacity onPress={() => router.push('/(tabs)/announcements')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' }} />
+                                            <Text style={{ fontWeight: 'bold', color: '#b91c1c' }}>
+                                                {unreadAnnouncementsCount} Yeni Duyuru
+                                            </Text>
+                                        </View>
+                                        <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Oku →</Text>
+                                    </TouchableOpacity>
+                                </Surface>
+                            )}
+
+                            {/* Swap Requests */}
+                            {swapRequests.length > 0 && (
+                                <View>
+                                    {swapRequests.map(req => (
+                                        <SwapRequestCard key={req.id} request={req} currentUserId={user!.id} />
+                                    ))}
+                                </View>
+                            )}
+
                             {/* User's Pending Requests */}
                             {myRequests.length > 0 && (
                                 <Surface style={styles.pendingRequestsCard} elevation={1}>
@@ -300,7 +387,7 @@ export default function DashboardScreen() {
                                     ))}
                                 </Surface>
                             )}
-                        </>
+                        </View>
                     }
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
@@ -447,11 +534,22 @@ export default function DashboardScreen() {
                                         Başka Güne Taşı
                                     </Button>
                                 </View>
+                                <Button
+                                    mode={requestType === 'swap' ? 'contained' : 'outlined'}
+                                    onPress={() => { setRequestType('swap'); setSwapTargetShift(null); }}
+                                    style={[styles.actionButton, requestType === 'swap' && { backgroundColor: '#8b5cf6' }]}
+                                    icon="account-switch"
+                                    compact
+                                >
+                                    Takas Et
+                                </Button>
 
-                                {/* Target Date (only for move) */}
-                                {requestType === 'move' && (
+                                {/* Target Date Selector (for move and swap) */}
+                                {(requestType === 'move' || requestType === 'swap') && (
                                     <>
-                                        <Text variant="labelLarge" style={{ marginBottom: 8, marginTop: 16 }}>Hangi tarihe taşınsın?</Text>
+                                        <Text variant="labelLarge" style={{ marginBottom: 8, marginTop: 16 }}>
+                                            {requestType === 'move' ? 'Hangi tarihe taşınsın?' : 'Takas yapılacak tarih?'}
+                                        </Text>
                                         <View style={styles.dateSelectorContainer}>
                                             <Button
                                                 mode="outlined"
@@ -479,6 +577,46 @@ export default function DashboardScreen() {
                                         <Text variant="bodySmall" style={{ color: '#6b7280', textAlign: 'center', marginBottom: 8 }}>
                                             {format(targetDate, 'EEEE', { locale: tr })}
                                         </Text>
+
+                                        {/* Swap: List available users */}
+                                        {requestType === 'swap' && (
+                                            <View style={{ marginTop: 8 }}>
+                                                <Text variant="labelLarge" style={{ marginBottom: 8 }}>Müsait Arkadaşlar ({availableSwapShifts.length})</Text>
+                                                {availableSwapShifts.length === 0 ? (
+                                                    <Text style={{ fontStyle: 'italic', color: '#6b7280', textAlign: 'center', padding: 10 }}>
+                                                        Bu tarihte meslektaşınız yok veya veri yüklenemedi.
+                                                    </Text>
+                                                ) : (
+                                                    availableSwapShifts.map(shift => (
+                                                        <Surface
+                                                            key={shift.id}
+                                                            style={{
+                                                                marginBottom: 8,
+                                                                borderRadius: 8,
+                                                                backgroundColor: swapTargetShift?.id === shift.id ? '#ede9fe' : '#f8fafc',
+                                                                borderWidth: swapTargetShift?.id === shift.id ? 2 : 1,
+                                                                borderColor: swapTargetShift?.id === shift.id ? '#8b5cf6' : '#e2e8f0'
+                                                            }}
+                                                        >
+                                                            <TouchableOpacity onPress={() => setSwapTargetShift(shift)} style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                                                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    <Text style={{ fontWeight: 'bold', color: '#64748b' }}>{shift.userName.charAt(0)}</Text>
+                                                                </View>
+                                                                <View style={{ flex: 1 }}>
+                                                                    <Text style={{ fontWeight: 'bold' }}>{shift.userName}</Text>
+                                                                    <Text style={{ fontSize: 12, color: '#64748b' }}>{SHIFT_SLOTS.find(s => s.id === shift.shiftSlot)?.labelTr}</Text>
+                                                                </View>
+                                                                {swapTargetShift?.id === shift.id && (
+                                                                    <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#8b5cf6', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        <Text style={{ color: 'white', fontSize: 10 }}>✓</Text>
+                                                                    </View>
+                                                                )}
+                                                            </TouchableOpacity>
+                                                        </Surface>
+                                                    ))
+                                                )}
+                                            </View>
+                                        )}
                                     </>
                                 )}
 
@@ -518,7 +656,7 @@ export default function DashboardScreen() {
                     </ScrollView>
                 </Modal>
             </Portal>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }
 

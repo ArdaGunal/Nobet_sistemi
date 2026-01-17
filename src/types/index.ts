@@ -86,7 +86,29 @@ export interface Shift {
 
 export type RequestType = 'swap' | 'leave' | 'preference';
 export type RequestStatus = 'pending' | 'approved' | 'rejected';
-export type RequestAction = 'add' | 'remove'; // İstenen işlem: vardiya ekleme veya çıkarma
+export type RequestAction = 'add' | 'remove';
+export type SwapStatus = 'pending_user' | 'pending_admin' | 'approved' | 'rejected' | 'expired';
+
+export interface SwapRequest {
+    id: string;
+    // İsteyen Kişi (User A)
+    requesterId: string;
+    requesterName: string;
+    requesterShiftId: string; // User A'nın vermek istediği vardiya ID
+    requesterDate: string;    // Vardiya tarihi
+    requesterSlot: ShiftSlot; // Vardiya saati
+
+    // Hedef Kişi (User B)
+    targetUserId: string;
+    targetUserName: string;
+    targetShiftId: string;    // User B'nin sahip olduğu vardiya ID
+    targetDate: string;
+    targetSlot: ShiftSlot;
+
+    status: SwapStatus;
+    expiresAt: number;        // Timestamp (48 saat süre)
+    createdAt: string;
+}
 
 export interface ShiftRequest {
     id: string;
@@ -97,7 +119,9 @@ export interface ShiftRequest {
     action?: RequestAction;      // 'add' = vardiyaya girmek, 'remove' = vardiyadan çıkmak
     shiftSlot?: ShiftSlot;       // İstenen vardiya dilimi
     requestedDate: string;       // İstek yapılan tarih
-    targetDate?: string;         // Takas için hedef tarih
+    // targetDate alanı swap özelindeydi ama yeni sistemde SwapRequest kullanacağız.
+    // Ancak geriye uyumluluk veya 'preference' tipi istekler için tutabiliriz.
+    targetDate?: string;
     targetUserId?: string;       // Takas için hedef kişi
     targetUserName?: string;
     message: string;             // Açıklama
