@@ -58,7 +58,7 @@ export const SwapRequestList = () => {
                 await approveSwapByAdmin(req);
                 // Başarı mesajı (Toast veya basit alert yerine console yeterli, liste güncelleniyor)
             } else {
-                await rejectSwapByAdmin(req.id);
+                await rejectSwapByAdmin(req.id, req);
             }
         } catch (e: any) {
             console.error(e);

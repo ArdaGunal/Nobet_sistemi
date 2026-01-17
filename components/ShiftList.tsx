@@ -6,19 +6,19 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
 import { Calendar } from 'lucide-react-native';
-import { Shift } from '@/types';
+import { ShiftAssignment } from '@/src/types';
 import { ShiftCard } from './ShiftCard';
 
 interface ShiftListProps {
-    shifts: Shift[];
+    shifts: ShiftAssignment[];
     isLoading?: boolean;
     isRefreshing?: boolean;
     onRefresh?: () => void;
     isAdmin?: boolean;
-    onEditShift?: (shift: Shift) => void;
-    onDeleteShift?: (shift: Shift) => void;
+    onEditShift?: (shift: ShiftAssignment) => void;
+    onDeleteShift?: (shift: ShiftAssignment) => void;
     selectedDate?: string; // Optional filter by date
     showDateSeparators?: boolean;
 }
@@ -26,7 +26,7 @@ interface ShiftListProps {
 interface GroupedShift {
     date: string;
     formattedDate: string;
-    shifts: Shift[];
+    shifts: ShiftAssignment[];
 }
 
 /**
@@ -55,7 +55,7 @@ const formatSectionDate = (dateString: string): string => {
 /**
  * Group shifts by date
  */
-const groupShiftsByDate = (shifts: Shift[]): GroupedShift[] => {
+const groupShiftsByDate = (shifts: ShiftAssignment[]): GroupedShift[] => {
     const grouped = shifts.reduce((acc, shift) => {
         const dateKey = shift.date;
         if (!acc[dateKey]) {
@@ -106,7 +106,7 @@ export const ShiftList: React.FC<ShiftListProps> = ({
             return filteredShifts.map((shift) => ({ type: 'shift' as const, data: shift }));
         }
 
-        const items: Array<{ type: 'header' | 'shift'; data: string | Shift }> = [];
+        const items: Array<{ type: 'header' | 'shift'; data: string | ShiftAssignment }> = [];
         groupedShifts.forEach((group) => {
             items.push({ type: 'header', data: group.formattedDate });
             group.shifts.forEach((shift) => {
@@ -119,9 +119,9 @@ export const ShiftList: React.FC<ShiftListProps> = ({
     // Loading state
     if (isLoading && shifts.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center py-20">
+            <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#0056b3" />
-                <Text className="mt-4 text-gray-500">Nöbetler yükleniyor...</Text>
+                <Text style={styles.loadingText}>Nöbetler yükleniyor...</Text>
             </View>
         );
     }
@@ -129,14 +129,12 @@ export const ShiftList: React.FC<ShiftListProps> = ({
     // Empty state
     if (filteredShifts.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center py-20 px-6">
-                <View className="w-20 h-20 rounded-full bg-gray-100 items-center justify-center mb-4">
+            <View style={styles.emptyContainer}>
+                <View style={styles.emptyIcon}>
                     <Calendar size={36} color="#9ca3af" />
                 </View>
-                <Text className="text-lg font-semibold text-gray-700 mb-2">
-                    Nöbet Bulunamadı
-                </Text>
-                <Text className="text-center text-gray-500">
+                <Text style={styles.emptyTitle}>Nöbet Bulunamadı</Text>
+                <Text style={styles.emptyText}>
                     {selectedDate
                         ? 'Seçilen tarih için nöbet kaydı bulunmuyor.'
                         : 'Henüz nöbet kaydı bulunmuyor.'}
@@ -152,13 +150,13 @@ export const ShiftList: React.FC<ShiftListProps> = ({
                 if (item.type === 'header') {
                     return `header-${item.data}`;
                 }
-                return (item.data as Shift).id;
+                return (item.data as ShiftAssignment).id;
             }}
             renderItem={({ item }) => {
                 if (item.type === 'header') {
                     return (
-                        <View className="px-4 py-3 bg-gray-50">
-                            <Text className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionHeaderText}>
                                 {item.data as string}
                             </Text>
                         </View>
@@ -166,9 +164,9 @@ export const ShiftList: React.FC<ShiftListProps> = ({
                 }
 
                 return (
-                    <View className="px-4">
+                    <View style={styles.cardContainer}>
                         <ShiftCard
-                            shift={item.data as Shift}
+                            shift={item.data as ShiftAssignment}
                             showDate={!showDateSeparators}
                             isAdmin={isAdmin}
                             onEdit={onEditShift}
@@ -192,5 +190,59 @@ export const ShiftList: React.FC<ShiftListProps> = ({
         />
     );
 };
+
+const styles = StyleSheet.create({
+    centerContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+    },
+    loadingText: {
+        marginTop: 16,
+        color: '#6b7280',
+    },
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 24,
+    },
+    emptyIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#f3f4f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#6b7280',
+    },
+    sectionHeader: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#f9fafb',
+    },
+    sectionHeaderText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#4b5563',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    cardContainer: {
+        paddingHorizontal: 16,
+    },
+});
 
 export default ShiftList;

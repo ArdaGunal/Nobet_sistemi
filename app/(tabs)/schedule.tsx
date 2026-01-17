@@ -83,7 +83,12 @@ export default function ScheduleScreen() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [dayCardHeight, setDayCardHeight] = useState(0);
-    const [targetDayIndex, setTargetDayIndex] = useState<number | null>(null);
+    const [targetDayIndex, setTargetDayIndex] = useState<number | null>(() => {
+        // Initialize to today's index so page scrolls to today on load
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        return dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Mon=0, Sun=6
+    });
 
     // Modal states
     const [modalVisible, setModalVisible] = useState(false);

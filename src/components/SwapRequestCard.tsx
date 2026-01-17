@@ -41,7 +41,7 @@ export const SwapRequestCard = ({ request, currentUserId }: SwapRequestCardProps
     const handleRespond = async (accept: boolean) => {
         setSubmitting(true);
         try {
-            await respondToSwapRequest(request.id, accept);
+            await respondToSwapRequest(request.id, accept, request);
         } catch (error) {
             console.error(error);
             alert('İşlem başarısız');

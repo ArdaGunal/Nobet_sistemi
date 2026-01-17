@@ -6,16 +6,16 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Moon, Sun, Sunset, Trash2, Edit3 } from 'lucide-react-native';
-import { Shift, SHIFT_SLOTS, ShiftSlotInfo } from '@/types';
+import { ShiftAssignment, SHIFT_SLOTS } from '@/src/types';
 
 interface ShiftCardProps {
-    shift: Shift;
+    shift: ShiftAssignment;
     showDate?: boolean;
     isAdmin?: boolean;
-    onEdit?: (shift: Shift) => void;
-    onDelete?: (shift: Shift) => void;
+    onEdit?: (shift: ShiftAssignment) => void;
+    onDelete?: (shift: ShiftAssignment) => void;
 }
 
 /**
@@ -59,50 +59,34 @@ export const ShiftCard: React.FC<ShiftCardProps> = ({
     const slotInfo = SHIFT_SLOTS.find((s) => s.id === shift.shiftSlot) || SHIFT_SLOTS[0];
 
     return (
-        <View
-            className="bg-white rounded-xl p-4 mb-3 shadow-sm border border-gray-100"
-            style={{
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.05,
-                shadowRadius: 8,
-                elevation: 2,
-            }}
-        >
+        <View style={styles.card}>
             {/* Header with Shift Slot */}
-            <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center flex-1">
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
                     {/* Shift Icon with colored background */}
-                    <View
-                        className="w-12 h-12 rounded-xl items-center justify-center mr-3"
-                        style={{ backgroundColor: `${slotInfo.color}15` }}
-                    >
+                    <View style={[styles.iconContainer, { backgroundColor: `${slotInfo.color}15` }]}>
                         {getShiftIcon(shift.shiftSlot, slotInfo.color)}
                     </View>
 
                     {/* Shift Time and Label */}
-                    <View className="flex-1">
-                        <Text className="text-lg font-semibold text-gray-900">
-                            {slotInfo.labelTr}
-                        </Text>
-                        <Text className="text-sm text-gray-500">
-                            {shift.shiftSlot}
-                        </Text>
+                    <View style={styles.shiftInfo}>
+                        <Text style={styles.shiftLabel}>{slotInfo.labelTr}</Text>
+                        <Text style={styles.shiftTime}>{shift.shiftSlot}</Text>
                     </View>
                 </View>
 
                 {/* Admin Actions */}
                 {isAdmin && (
-                    <View className="flex-row items-center">
+                    <View style={styles.actions}>
                         <TouchableOpacity
                             onPress={() => onEdit?.(shift)}
-                            className="w-10 h-10 rounded-lg items-center justify-center mr-2 bg-blue-50"
+                            style={[styles.actionBtn, styles.editBtn]}
                         >
                             <Edit3 size={18} color="#0056b3" />
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => onDelete?.(shift)}
-                            className="w-10 h-10 rounded-lg items-center justify-center bg-red-50"
+                            style={[styles.actionBtn, styles.deleteBtn]}
                         >
                             <Trash2 size={18} color="#ef4444" />
                         </TouchableOpacity>
@@ -111,25 +95,111 @@ export const ShiftCard: React.FC<ShiftCardProps> = ({
             </View>
 
             {/* Assigned User */}
-            <View className="bg-gray-50 rounded-lg p-3 mb-2">
-                <Text className="text-xs text-gray-400 uppercase tracking-wide mb-1">
-                    Nöbetçi
-                </Text>
-                <Text className="text-base font-medium text-gray-800">
-                    {shift.userName}
-                </Text>
+            <View style={styles.userContainer}>
+                <Text style={styles.userLabel}>Nöbetçi</Text>
+                <Text style={styles.userName}>{shift.userName}</Text>
             </View>
 
             {/* Date */}
             {showDate && (
-                <View className="pt-2 border-t border-gray-100">
-                    <Text className="text-sm text-gray-500">
-                        📅 {formatDate(shift.date)}
-                    </Text>
+                <View style={styles.dateContainer}>
+                    <Text style={styles.dateText}>📅 {formatDate(shift.date)}</Text>
                 </View>
             )}
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    shiftInfo: {
+        flex: 1,
+    },
+    shiftLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    shiftTime: {
+        fontSize: 14,
+        color: '#6b7280',
+    },
+    actions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    actionBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    editBtn: {
+        backgroundColor: '#dbeafe',
+        marginRight: 8,
+    },
+    deleteBtn: {
+        backgroundColor: '#fee2e2',
+    },
+    userContainer: {
+        backgroundColor: '#f9fafb',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 8,
+    },
+    userLabel: {
+        fontSize: 11,
+        color: '#9ca3af',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    userName: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: '#374151',
+    },
+    dateContainer: {
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#f3f4f6',
+    },
+    dateText: {
+        fontSize: 13,
+        color: '#6b7280',
+    },
+});
 
 export default ShiftCard;

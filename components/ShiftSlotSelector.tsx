@@ -6,9 +6,9 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Moon, Sun, Sunset } from 'lucide-react-native';
-import { ShiftSlot, SHIFT_SLOTS, ShiftSlotInfo } from '@/types';
+import { ShiftSlot, SHIFT_SLOTS } from '@/src/types';
 
 interface ShiftSlotSelectorProps {
     selectedSlot: ShiftSlot | null;
@@ -41,7 +41,7 @@ export const ShiftSlotSelector: React.FC<ShiftSlotSelectorProps> = ({
     disabled = false,
 }) => {
     return (
-        <View className="flex-row justify-between">
+        <View style={styles.container}>
             {SHIFT_SLOTS.map((slot) => {
                 const isSelected = slot.id === selectedSlot;
 
@@ -50,36 +50,38 @@ export const ShiftSlotSelector: React.FC<ShiftSlotSelectorProps> = ({
                         key={slot.id}
                         onPress={() => !disabled && onSelectSlot(slot.id)}
                         disabled={disabled}
-                        className={`flex-1 mx-1 rounded-xl p-4 items-center ${disabled ? 'opacity-50' : ''
-                            }`}
-                        style={{
-                            backgroundColor: isSelected ? slot.color : '#f3f4f6',
-                            shadowColor: isSelected ? slot.color : '#000',
-                            shadowOffset: { width: 0, height: isSelected ? 4 : 1 },
-                            shadowOpacity: isSelected ? 0.3 : 0.05,
-                            shadowRadius: isSelected ? 8 : 2,
-                            elevation: isSelected ? 4 : 1,
-                        }}
+                        style={[
+                            styles.slotButton,
+                            { backgroundColor: isSelected ? slot.color : '#f3f4f6' },
+                            isSelected && {
+                                shadowColor: slot.color,
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 8,
+                                elevation: 4,
+                            },
+                            disabled && styles.disabled,
+                        ]}
                     >
                         {/* Icon */}
-                        <View className="mb-2">
+                        <View style={styles.iconContainer}>
                             {getShiftIcon(slot.id, isSelected)}
                         </View>
 
                         {/* Label */}
-                        <Text
-                            className={`text-sm font-semibold mb-1 ${isSelected ? 'text-white' : 'text-gray-700'
-                                }`}
-                        >
+                        <Text style={[
+                            styles.label,
+                            isSelected && styles.labelSelected
+                        ]}>
                             {slot.labelTr}
                         </Text>
 
                         {/* Time Range */}
-                        <Text
-                            className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'
-                                }`}
-                        >
-                            {slot.startTime} - {slot.endTime}
+                        <Text style={[
+                            styles.timeRange,
+                            isSelected && styles.timeRangeSelected
+                        ]}>
+                            {slot.id}
                         </Text>
                     </TouchableOpacity>
                 );
@@ -87,5 +89,46 @@ export const ShiftSlotSelector: React.FC<ShiftSlotSelectorProps> = ({
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    container: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    slotButton: {
+        flex: 1,
+        marginHorizontal: 4,
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    disabled: {
+        opacity: 0.5,
+    },
+    iconContainer: {
+        marginBottom: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 4,
+    },
+    labelSelected: {
+        color: '#fff',
+    },
+    timeRange: {
+        fontSize: 11,
+        color: '#6b7280',
+    },
+    timeRangeSelected: {
+        color: 'rgba(255,255,255,0.8)',
+    },
+});
 
 export default ShiftSlotSelector;

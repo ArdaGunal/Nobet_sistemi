@@ -6,7 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface DateSelectorProps {
@@ -73,20 +73,18 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
     }, [selectedDate]);
 
     return (
-        <View className="bg-white border-b border-gray-100">
+        <View style={styles.container}>
             {/* Month Header */}
-            <View className="flex-row items-center justify-between px-4 py-3">
-                <Text className="text-lg font-semibold text-gray-900">
-                    {headerDate}
-                </Text>
-                <View className="flex-row items-center">
+            <View style={styles.header}>
+                <Text style={styles.headerText}>{headerDate}</Text>
+                <View style={styles.navButtons}>
                     <TouchableOpacity
                         onPress={() => {
                             const newDate = new Date(selectedDate);
                             newDate.setDate(newDate.getDate() - 1);
                             onDateChange(toISODate(newDate));
                         }}
-                        className="w-8 h-8 rounded-full items-center justify-center bg-gray-100 mr-2"
+                        style={[styles.navButton, { marginRight: 8 }]}
                     >
                         <ChevronLeft size={20} color="#374151" />
                     </TouchableOpacity>
@@ -96,7 +94,7 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
                             newDate.setDate(newDate.getDate() + 1);
                             onDateChange(toISODate(newDate));
                         }}
-                        className="w-8 h-8 rounded-full items-center justify-center bg-gray-100"
+                        style={styles.navButton}
                     >
                         <ChevronRight size={20} color="#374151" />
                     </TouchableOpacity>
@@ -116,28 +114,26 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
                         <TouchableOpacity
                             key={item.isoDate}
                             onPress={() => onDateChange(item.isoDate)}
-                            className={`w-14 h-18 rounded-xl items-center justify-center mx-1 py-2 ${isSelected
-                                    ? 'bg-primary'
-                                    : item.isToday
-                                        ? 'bg-blue-50 border border-primary'
-                                        : 'bg-gray-50'
-                                }`}
-                            style={isSelected ? { backgroundColor: '#0056b3' } : undefined}
+                            style={[
+                                styles.datePill,
+                                isSelected && styles.datePillSelected,
+                                item.isToday && !isSelected && styles.datePillToday,
+                            ]}
                         >
-                            <Text
-                                className={`text-xs font-medium mb-1 ${isSelected ? 'text-white' : 'text-gray-500'
-                                    }`}
-                            >
+                            <Text style={[
+                                styles.dayName,
+                                isSelected && styles.dayNameSelected
+                            ]}>
                                 {item.dayName}
                             </Text>
-                            <Text
-                                className={`text-lg font-bold ${isSelected ? 'text-white' : 'text-gray-900'
-                                    }`}
-                            >
+                            <Text style={[
+                                styles.dayNumber,
+                                isSelected && styles.dayNumberSelected
+                            ]}>
                                 {item.dayNumber}
                             </Text>
                             {item.isToday && !isSelected && (
-                                <View className="w-1.5 h-1.5 rounded-full bg-primary mt-1" style={{ backgroundColor: '#0056b3' }} />
+                                <View style={styles.todayDot} />
                             )}
                         </TouchableOpacity>
                     );
@@ -146,5 +142,78 @@ export const DateSelector: React.FC<DateSelectorProps> = ({
         </View>
     );
 };
+
+const styles = StyleSheet.create({
+    container: {
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    headerText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    navButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    navButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f3f4f6',
+    },
+    datePill: {
+        width: 56,
+        paddingVertical: 8,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 4,
+        backgroundColor: '#f9fafb',
+    },
+    datePillSelected: {
+        backgroundColor: '#0056b3',
+    },
+    datePillToday: {
+        backgroundColor: '#eff6ff',
+        borderWidth: 1,
+        borderColor: '#0056b3',
+    },
+    dayName: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#6b7280',
+        marginBottom: 4,
+    },
+    dayNameSelected: {
+        color: '#fff',
+    },
+    dayNumber: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#111827',
+    },
+    dayNumberSelected: {
+        color: '#fff',
+    },
+    todayDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#0056b3',
+        marginTop: 4,
+    },
+});
 
 export default DateSelector;

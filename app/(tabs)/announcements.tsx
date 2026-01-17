@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, FlatList, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, FAB, Portal, Dialog, TextInput, Button, Card, Avatar, useTheme, IconButton, Chip } from 'react-native-paper';
+import { Text, FAB, Portal, Dialog, TextInput, Button, Card, Avatar, useTheme, IconButton, Chip, SegmentedButtons } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext';
-import { Announcement } from '@/src/types';
+import { Announcement, UserNotification } from '@/src/types';
 import { createAnnouncement, deleteAnnouncement, subscribeToAnnouncements, markAnnouncementAsRead } from '@/src/services/announcementService';
+import { subscribeToUserNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/src/services/notificationService';
 
 export default function AnnouncementsScreen() {
     const theme = useTheme();
     const { user, isAdmin } = useAuth();
 
+    const [activeTab, setActiveTab] = useState<'announcements' | 'notifications'>('announcements');
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [notifications, setNotifications] = useState<UserNotification[]>([]);
     const [createVisible, setCreateVisible] = useState(false);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
     const [loading, setLoading] = useState(false);
@@ -28,6 +31,15 @@ export default function AnnouncementsScreen() {
         });
         return () => unsubscribe();
     }, []);
+
+    // Kişisel bildirimler
+    useEffect(() => {
+        if (!user) return;
+        const unsubscribe = subscribeToUserNotifications(user.id, (data) => {
+            setNotifications(data);
+        });
+        return () => unsubscribe();
+    }, [user]);
 
     const handleCreate = async () => {
         if (!title || !content || !user) return;
@@ -131,18 +143,91 @@ export default function AnnouncementsScreen() {
                 </Text>
             </View>
 
-            <FlatList
-                data={announcements}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Avatar.Icon size={64} icon="bullhorn-outline" style={{ backgroundColor: '#f1f5f9' }} color="#94a3b8" />
-                        <Text style={{ marginTop: 16, color: '#94a3b8' }}>Henüz duyuru yok</Text>
-                    </View>
-                }
-            />
+            {/* Tab Navigation */}
+            <View style={styles.tabContainer}>
+                <SegmentedButtons
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as 'announcements' | 'notifications')}
+                    buttons={[
+                        { value: 'announcements', label: 'Genel Duyurular' },
+                        {
+                            value: 'notifications',
+                            label: `Bildirimlerim${notifications.filter(n => !n.isRead).length > 0 ? ` (${notifications.filter(n => !n.isRead).length})` : ''}`
+                        },
+                    ]}
+                />
+            </View>
+
+            {/* Content based on active tab */}
+            {activeTab === 'announcements' ? (
+                <FlatList
+                    data={announcements}
+                    renderItem={renderItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Avatar.Icon size={64} icon="bullhorn-outline" style={{ backgroundColor: '#f1f5f9' }} color="#94a3b8" />
+                            <Text style={{ marginTop: 16, color: '#94a3b8' }}>Henüz duyuru yok</Text>
+                        </View>
+                    }
+                />
+            ) : (
+                <FlatList
+                    data={notifications}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={[
+                                styles.notificationCard,
+                                { borderLeftColor: item.color === 'green' ? '#22c55e' : item.color === 'red' ? '#ef4444' : '#3b82f6' }
+                            ]}
+                            onPress={() => markNotificationAsRead(item.id)}
+                        >
+                            <View style={styles.notificationHeader}>
+                                <Text variant="titleSmall" style={{ fontWeight: item.isRead ? 'normal' : 'bold' }}>
+                                    {item.title}
+                                </Text>
+                                {!item.isRead && (
+                                    <Chip compact style={{ height: 20, backgroundColor: theme.colors.primaryContainer }}>
+                                        <Text style={{ fontSize: 9 }}>Yeni</Text>
+                                    </Chip>
+                                )}
+                            </View>
+                            <Text
+                                variant="bodyMedium"
+                                style={{
+                                    color: item.color === 'green' ? '#16a34a' : item.color === 'red' ? '#dc2626' : '#374151',
+                                    marginTop: 4
+                                }}
+                            >
+                                {item.message}
+                            </Text>
+                            <Text variant="labelSmall" style={{ color: '#94a3b8', marginTop: 8 }}>
+                                {format(new Date(item.createdAt), 'd MMM HH:mm', { locale: tr })}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Avatar.Icon size={64} icon="bell-outline" style={{ backgroundColor: '#f1f5f9' }} color="#94a3b8" />
+                            <Text style={{ marginTop: 16, color: '#94a3b8' }}>Henüz bildirim yok</Text>
+                        </View>
+                    }
+                    ListHeaderComponent={
+                        notifications.filter(n => !n.isRead).length > 0 ? (
+                            <Button
+                                mode="text"
+                                onPress={() => user && markAllNotificationsAsRead(user.id)}
+                                style={{ alignSelf: 'flex-end', marginBottom: 8 }}
+                            >
+                                Tümünü Okundu İşaretle
+                            </Button>
+                        ) : null
+                    }
+                />
+            )}
 
             {isAdmin && (
                 <FAB
@@ -277,5 +362,25 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 32,
         marginTop: 32
-    }
+    },
+    tabContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    notificationCard: {
+        backgroundColor: '#fff',
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#3b82f6',
+    },
+    notificationHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
 });

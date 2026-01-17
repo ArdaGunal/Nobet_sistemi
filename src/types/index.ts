@@ -194,6 +194,20 @@ export interface Announcement {
     readBy: string[]; // List of user IDs who read the announcement
 }
 
+// Kişiye özel bildirim tipi
+export type NotificationType = 'swap_approved' | 'swap_rejected' | 'system';
+
+export interface UserNotification {
+    id: string;
+    userId: string;              // Bildirimi alan kullanıcı
+    type: NotificationType;
+    title: string;
+    message: string;
+    isRead: boolean;
+    color?: 'green' | 'red' | 'blue';  // Görsel renk
+    createdAt: string;
+}
+
 // Vardiya minimum personel sayısı kuralı
 export const SHIFT_REQUIREMENTS = {
     saglikci: 2,
