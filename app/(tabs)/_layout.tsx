@@ -84,7 +84,7 @@ export default function DrawerLayout() {
     const [lastAnnouncementTitle, setLastAnnouncementTitle] = useState('');
 
     // Calculate total notifications for the hamburger menu
-    const totalNotifications = unreadMessagesCount + unreadAnnouncements + pendingSwaps;
+    const totalNotifications = unreadMessagesCount + unreadAnnouncementsCount + pendingSwaps;
     const totalRequestsBadge = pendingRequestsCount;
 
     useEffect(() => {
