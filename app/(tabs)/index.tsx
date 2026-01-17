@@ -392,7 +392,7 @@ export default function DashboardScreen() {
                     icon={({ size, color }) => <Plus size={size} color={color} />}
                     style={[styles.fab, { backgroundColor: theme.colors.primary }]}
                     onPress={openRequestModal}
-                    label={isMobile ? undefined : "Vardiya İste"}
+                    label="Vardiyalarım"
                 />
             )}
 
@@ -418,7 +418,7 @@ export default function DashboardScreen() {
                                     📋 Vardiyalarım
                                 </Text>
                                 <Text variant="bodyMedium" style={{ color: '#6b7280', textAlign: 'center', marginBottom: 16 }}>
-                                    Değişiklik yapmak istediğiniz vardiyayı seçin
+                                    Değişiklik yapmak isterseniz vardiyanızın üzerine tıklayın.
                                 </Text>
 
                                 {myShifts.length === 0 ? (
@@ -509,7 +509,7 @@ export default function DashboardScreen() {
                                         icon="close-circle"
                                         compact
                                     >
-                                        İptal Et
+                                        Vardiyayı İptal Et
                                     </Button>
                                 </View>
                                 <Button

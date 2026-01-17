@@ -120,14 +120,14 @@ export default function RequestsScreen() {
         setModalVisible(true);
     };
 
-    const handleResponse = async (status: 'approved' | 'rejected') => {
-        if (!selectedRequest) return;
+    const handleResponse = async (request: ShiftRequest, status: 'approved' | 'rejected') => {
+        if (!request) return;
 
         setResponding(true);
         try {
             // Eğer onaylandıysa ve bu bir vardiya değişikliği isteğiyse otomatik işlem yap
-            if (status === 'approved' && selectedRequest.shiftSlot) {
-                const { userId, userName, userStaffRole, requestedDate, shiftSlot, action, targetDate } = selectedRequest;
+            if (status === 'approved' && request.shiftSlot) {
+                const { userId, userName, userStaffRole, requestedDate, shiftSlot, action, targetDate } = request;
 
                 if (action === 'remove') {
                     // 1. Mevcut vardiyayı bul
@@ -163,7 +163,7 @@ export default function RequestsScreen() {
                 }
             }
 
-            await updateRequestStatus(selectedRequest.id, status, adminResponse);
+            await updateRequestStatus(request.id, status, adminResponse);
             setModalVisible(false);
             Alert.alert(
                 'Başarılı',
@@ -341,7 +341,26 @@ export default function RequestsScreen() {
                         <Button
                             mode="outlined"
                             textColor={theme.colors.error}
-                            onPress={() => openResponseModal(item)}
+                            onPress={() => {
+                                if (Platform.OS === 'web') {
+                                    if (confirm('Bu isteği reddetmek istediğinize emin misiniz?')) {
+                                        setSelectedRequest(item);
+                                        handleResponse(item, 'rejected');
+                                    }
+                                } else {
+                                    Alert.alert('Reddet', 'Emin misiniz?', [
+                                        { text: 'İptal', style: 'cancel' },
+                                        {
+                                            text: 'Reddet',
+                                            style: 'destructive',
+                                            onPress: () => {
+                                                setSelectedRequest(item);
+                                                handleResponse(item, 'rejected');
+                                            }
+                                        }
+                                    ]);
+                                }
+                            }}
                             style={{ width: '100%' }}
                         >
                             Reddet
@@ -352,7 +371,7 @@ export default function RequestsScreen() {
                             mode="contained"
                             onPress={() => {
                                 setSelectedRequest(item);
-                                handleResponse('approved');
+                                handleResponse(item, 'approved');
                             }}
                             style={{ width: '100%' }}
                         >
