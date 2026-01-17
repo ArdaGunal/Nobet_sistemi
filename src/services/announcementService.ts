@@ -9,7 +9,10 @@ import {
     onSnapshot,
     serverTimestamp,
     where,
-    arrayUnion
+    arrayUnion,
+    limit,
+    getDocs,
+    writeBatch
 } from 'firebase/firestore';
 import { db } from '@/config/firebase.config';
 import { Announcement } from '@/src/types';
@@ -108,7 +111,8 @@ export const subscribeToAnnouncements = (
 ) => {
     const q = query(
         collection(db, ANNOUNCEMENTS_COLLECTION),
-        orderBy('createdAt', 'desc')
+        orderBy('createdAt', 'desc'),
+        limit(50)
     );
 
     return onSnapshot(q, (snapshot) => {
@@ -118,4 +122,38 @@ export const subscribeToAnnouncements = (
         })) as Announcement[];
         onUpdate(announcements);
     });
+};
+
+/**
+ * Cleanup announcements older than 30 days
+ */
+export const cleanupOldAnnouncements = async () => {
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffDate = thirtyDaysAgo.toISOString();
+
+        const q = query(
+            collection(db, ANNOUNCEMENTS_COLLECTION),
+            where('createdAt', '<', cutoffDate)
+        );
+
+        const snapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            console.log(`Cleanup: ${count} old announcements deleted.`);
+        }
+        return count;
+    } catch (error) {
+        console.error('Announcement cleanup failed:', error);
+        return 0;
+    }
 };

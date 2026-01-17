@@ -14,7 +14,8 @@ import {
     deleteDoc,
     getDocs,
     writeBatch,
-    limit
+    limit,
+    collectionGroup
 } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
 import { ChatMessage, ChatRoom, User, UserRole } from '../types';
@@ -230,11 +231,43 @@ export const deleteChatRoom = async (roomId: string): Promise<void> => {
         });
         await batch.commit();
 
-        // 2. Delete the room document
-        await deleteDoc(doc(db, CHATS_COLLECTION, roomId));
-
     } catch (error) {
         console.error('Error deleting chat room:', error);
         throw error;
+    }
+};
+
+/**
+ * Cleanup messages older than 30 days from ALL chat rooms.
+ */
+export const cleanupOldMessages = async () => {
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const cutoffDate = thirtyDaysAgo.toISOString();
+
+        // Use collectionGroup to find all messages across all rooms
+        const q = query(
+            collectionGroup(db, MESSAGES_SUBCOLLECTION),
+            where('createdAt', '<', cutoffDate)
+        );
+
+        const snapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            console.log(`Cleanup: ${count} old messages deleted.`);
+        }
+        return count;
+    } catch (error) {
+        console.error('Message cleanup failed:', error);
+        return 0;
     }
 };

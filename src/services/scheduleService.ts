@@ -344,3 +344,37 @@ export const checkShiftRequirements = (
         missing,
     };
 };
+
+/**
+ * Cleanup shifts older than 1 year
+ */
+export const cleanupOldShifts = async () => {
+    try {
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const cutoffDate = oneYearAgo.toISOString().split('T')[0];
+
+        const q = query(
+            collection(db, SCHEDULE_COLLECTION),
+            where('date', '<', cutoffDate)
+        );
+
+        const snapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            console.log(`Cleanup: ${count} old shifts deleted.`);
+        }
+        return count;
+    } catch (error) {
+        console.error('Shift cleanup failed:', error);
+        return 0;
+    }
+};

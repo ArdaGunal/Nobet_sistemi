@@ -35,12 +35,18 @@ import { subscribeToUsers, approveUser, deleteUser } from '@/src/services/userSe
 import { findAssignment, deleteShiftAssignment, createShiftAssignment } from '@/src/services/scheduleService';
 import { AppTooltip } from '@/src/components';
 
-import { subscribeToAdminSwapRequests, approveSwapByAdmin, rejectSwapByAdmin } from '@/src/services/swapService';
+import { subscribeToAdminSwapRequests, approveSwapByAdmin, rejectSwapByAdmin, cleanupSwapRequests } from '@/src/services/swapService';
 import { SwapRequest } from '@/src/types';
 
 type TabValue = 'shift_requests' | 'user_requests' | 'swap_requests';
 
 export default function RequestsScreen() {
+    // ... code ...
+
+    // Cleanup old requests on mount (Admin maintenance)
+    useEffect(() => {
+        cleanupSwapRequests();
+    }, []);
     const theme = useTheme();
     const { user: currentUser, isAdmin } = useAuth();
 
@@ -55,9 +61,9 @@ export default function RequestsScreen() {
     const pendingUsers = users.filter(u => !u.isApproved && u.role === 'user');
     const [loadingUsers, setLoadingUsers] = useState(true);
 
-    // Swap Requests State - Removed, managed by SwapRequestList component
-    // const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
-    // const [loadingSwaps, setLoadingSwaps] = useState(true);
+    // Swap Requests State
+    const [swapRequests, setSwapRequests] = useState<SwapRequest[]>([]);
+    // const [loadingSwaps, setLoadingSwaps] = useState(true); // Loading state not strictly needed for badge, but good to have if we used it
 
     // Shift Response Modal
     const [modalVisible, setModalVisible] = useState(false);
@@ -108,16 +114,15 @@ export default function RequestsScreen() {
             }
         );
 
-        // Swap subscription removed
-        // const unsubscribeSwaps = subscribeToAdminSwapRequests((data) => {
-        //     setSwapRequests(data);
-        //     setLoadingSwaps(false);
-        // });
+        const unsubscribeSwaps = subscribeToAdminSwapRequests((data) => {
+            setSwapRequests(data);
+            // setLoadingSwaps(false);
+        });
 
         return () => {
             unsubscribeRequests();
             unsubscribeUsers();
-            // unsubscribeSwaps(); // Removed
+            unsubscribeSwaps();
         };
     }, []);
 
@@ -428,15 +433,17 @@ export default function RequestsScreen() {
         );
     };
 
+    const totalRequests = requests.length + pendingUsers.length + swapRequests.length;
+
     return (
         <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
             <View style={styles.header}>
                 <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
                     İstekler
                 </Text>
-                {(requests.length > 0 || pendingUsers.length > 0) && (
+                {totalRequests > 0 && (
                     <Chip icon="bell-ring" style={{ backgroundColor: theme.colors.errorContainer }}>
-                        Toplam {requests.length + pendingUsers.length}
+                        Toplam {totalRequests}
                     </Chip>
                 )}
             </View>
@@ -446,9 +453,9 @@ export default function RequestsScreen() {
                     value={activeTab}
                     onValueChange={(value) => setActiveTab(value as TabValue)}
                     buttons={[
-                        { value: 'shift_requests', label: 'İzin/Vardiya' },
-                        { value: 'user_requests', label: `Kayıt (${pendingUsers.length})` },
-                        { value: 'swap_requests', label: 'Takas' },
+                        { value: 'shift_requests', label: `İzin/Vardiya${requests.length > 0 ? ` (${requests.length})` : ''}` },
+                        { value: 'user_requests', label: `Kayıt${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}` },
+                        { value: 'swap_requests', label: `Takas${swapRequests.length > 0 ? ` (${swapRequests.length})` : ''}` },
                     ]}
                     style={{ marginBottom: 16 }}
                 />
@@ -538,6 +545,75 @@ export default function RequestsScreen() {
                     </View>
                 </View>
             )}
+
+            {/* User Approval Modal */}
+            <Portal>
+                <Modal
+                    visible={approvalModalVisible}
+                    onDismiss={() => setApprovalModalVisible(false)}
+                    contentContainerStyle={styles.modalSurface}
+                >
+                    <Text variant="headlineSmall" style={{ marginBottom: 16, fontWeight: 'bold', textAlign: 'center' }}>
+                        Kullanıcıyı Onayla
+                    </Text>
+
+                    {selectedUser && (
+                        <View style={styles.userPreview}>
+                            <Text style={{ fontWeight: 'bold' }}>{selectedUser.fullName}</Text>
+                            <Text>{selectedUser.email}</Text>
+                        </View>
+                    )}
+
+                    <Divider style={{ marginVertical: 16 }} />
+
+                    <Text variant="titleMedium" style={{ marginBottom: 12 }}>
+                        Meslek Seçin
+                    </Text>
+                    <RadioButton.Group
+                        onValueChange={value => setSelectedStaffRole(value as StaffRole)}
+                        value={selectedStaffRole}
+                    >
+                        {STAFF_ROLES.map(role => (
+                            <RadioButton.Item
+                                key={role.id}
+                                label={role.labelTr}
+                                value={role.id}
+                                style={styles.radioItem}
+                            />
+                        ))}
+                    </RadioButton.Group>
+
+                    <Divider style={{ marginVertical: 16 }} />
+
+                    <Text variant="titleMedium" style={{ marginBottom: 12 }}>
+                        Rotasyon Grubu
+                    </Text>
+                    <SegmentedButtons
+                        value={selectedRotationGroup}
+                        onValueChange={value => setSelectedRotationGroup(value as RotationGroup)}
+                        buttons={[
+                            { value: 'A', label: 'Grup A' },
+                            { value: 'B', label: 'Grup B' },
+                            { value: 'C', label: 'Grup C' },
+                        ]}
+                    />
+
+                    <View style={styles.modalActions}>
+                        <Button mode="outlined" onPress={() => setApprovalModalVisible(false)} style={{ flex: 1 }}>
+                            İptal
+                        </Button>
+                        <Button
+                            mode="contained"
+                            onPress={handleApproveUser}
+                            loading={approving}
+                            disabled={approving}
+                            style={{ flex: 1 }}
+                        >
+                            Onayla
+                        </Button>
+                    </View>
+                </Modal>
+            </Portal>
         </View>
     );
 }

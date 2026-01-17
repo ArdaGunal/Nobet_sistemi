@@ -10,21 +10,52 @@ import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { PaperProvider, ActivityIndicator, Text } from 'react-native-paper';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { theme } from '@/src/theme';
+
+// Cleanup Services
+import { cleanupSwapRequests } from '@/src/services/swapService';
+import { cleanupOldAnnouncements } from '@/src/services/announcementService';
+import { cleanupOldMessages } from '@/src/services/chatService';
+import { cleanupOldShifts } from '@/src/services/scheduleService';
+import { checkMaintenanceNeeded, updateLastMaintenanceDate } from '@/src/services/systemService';
 
 /**
  * Navigation Guard Component
  * Handles auth-based routing including approval status
  */
 function NavigationGuard({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading, isApproved } = useAuth();
+    const { isAuthenticated, isLoading, isApproved, user, isAdmin } = useAuth();
     const segments = useSegments();
     const router = useRouter();
+
+    // Smart Maintenance Check
+    useEffect(() => {
+        const runMaintenance = async () => {
+            if (isAuthenticated && isAdmin) {
+                const needsMaintenance = await checkMaintenanceNeeded();
+                if (needsMaintenance) {
+                    console.log('🤖 Auto-Maintenance Triggered...');
+                    await Promise.all([
+                        cleanupSwapRequests(),
+                        cleanupOldAnnouncements(),
+                        cleanupOldMessages(),
+                        cleanupOldShifts()
+                    ]);
+                    await updateLastMaintenanceDate();
+                    console.log('✅ Auto-Maintenance Complete.');
+                }
+            }
+        };
+
+        if (!isLoading && isAuthenticated) {
+            runMaintenance();
+        }
+    }, [isAuthenticated, isLoading, isAdmin]);
 
     useEffect(() => {
         if (isLoading) return;

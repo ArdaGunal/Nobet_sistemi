@@ -25,7 +25,7 @@ import {
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
-import { subscribeToUsers, updateUser, deleteUser, revokeUserApproval } from '@/src/services/userService';
+import { subscribeToUsers, updateUser, deleteUser, revokeUserApproval, syncUserShiftRoles, repairDatabase } from '@/src/services/userService';
 import { User, StaffRole, STAFF_ROLES, RotationGroup, UserRole } from '@/src/types';
 import { AppTooltip } from '@/src/components';
 
@@ -242,12 +242,46 @@ export default function UsersScreen() {
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['bottom']}>
             {/* Header */}
             <View style={styles.header}>
-                <Text variant="headlineSmall" style={{ fontWeight: 'bold' }}>
-                    Personel Listesi
-                </Text>
-                <Chip icon="account-group">
-                    {displayedUsers.length} Kişi
-                </Chip>
+                <View>
+                    <Text variant="headlineSmall" style={{ fontWeight: 'bold' }}>
+                        Personel Listesi
+                    </Text>
+                    <Chip icon="account-group" style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                        {displayedUsers.length} Kişi
+                    </Chip>
+                </View>
+                {currentUser?.role === 'super_admin' && (
+                    <Button
+                        mode="contained-tonal"
+                        icon="database-refresh"
+                        compact
+                        onPress={() => {
+                            Alert.alert(
+                                'Veri Tabanını Onar',
+                                'Eski kullanıcı verilerini güncel formata çevirmek ve tüm nöbet renklerini eşitlemek üzeresiniz. Bu işlem biraz zaman alabilir.',
+                                [
+                                    { text: 'İptal', style: 'cancel' },
+                                    {
+                                        text: 'Onar',
+                                        onPress: async () => {
+                                            setLoading(true);
+                                            try {
+                                                const result = await repairDatabase();
+                                                Alert.alert('Başarılı', result);
+                                            } catch (e: any) {
+                                                Alert.alert('Hata', e.message);
+                                            } finally {
+                                                setLoading(false);
+                                            }
+                                        }
+                                    }
+                                ]
+                            );
+                        }}
+                    >
+                        Verileri Onar
+                    </Button>
+                )}
             </View>
 
             {/* User List */}
@@ -336,6 +370,29 @@ export default function UsersScreen() {
                             { value: 'C', label: 'Grup C' },
                         ]}
                     />
+
+                    <View style={styles.modalActions}>
+                        <Button
+                            mode="text"
+                            onPress={async () => {
+                                if (!editingUser) return;
+                                setSaving(true);
+                                try {
+                                    await syncUserShiftRoles(editingUser.id, editStaffRole);
+                                    Alert.alert('Bilgi', 'Tüm vardiyalar seçili mesleğe göre güncellendi.');
+                                } catch (e: any) {
+                                    Alert.alert('Hata', e.message);
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}
+                            textColor={theme.colors.primary}
+                            compact
+                            disabled={saving}
+                        >
+                            Vardiyaları Eşitle
+                        </Button>
+                    </View>
 
                     <View style={styles.modalActions}>
                         <Button

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { View, StyleSheet, FlatList, ScrollView, Alert, Platform } from 'react-native';
 import { Text, FAB, Portal, Dialog, TextInput, Button, Card, Avatar, useTheme, IconButton, Chip } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { format } from 'date-fns';
@@ -7,7 +7,14 @@ import { tr } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext';
 import { Announcement } from '@/src/types';
 import { createAnnouncement, deleteAnnouncement, subscribeToAnnouncements, markAnnouncementAsRead } from '@/src/services/announcementService';
-import { subscribeToPersonalNotifications, markNotificationAsRead as markPersonalAsRead, PersonalNotification } from '@/src/services/personalNotificationService';
+import {
+    subscribeToPersonalNotifications,
+    markNotificationAsRead as markPersonalAsRead,
+    PersonalNotification,
+    deletePersonalNotification,
+    cleanupExpiredNotifications,
+    deleteAllPersonalNotifications
+} from '@/src/services/personalNotificationService';
 
 export default function AnnouncementsScreen() {
     const theme = useTheme();
@@ -34,7 +41,14 @@ export default function AnnouncementsScreen() {
     // Subscribe to Personal Notifications
     useEffect(() => {
         if (!user) return;
+
+        console.log("Subscribing to personal notifications for:", user.id);
+
+        // Cleanup expired on load (Client-side auto-delete)
+        cleanupExpiredNotifications(user.id);
+
         const unsub = subscribeToPersonalNotifications(user.id, (data) => {
+            console.log("Personal notifications updated:", data.length);
             setPersonalNotifications(data);
         });
         return () => unsub();
@@ -229,6 +243,37 @@ export default function AnnouncementsScreen() {
                             {isAdmin && !isPersonalNotification && (
                                 <IconButton {...props} icon="delete" onPress={() => handleDelete(item.id)} iconColor="#ef4444" />
                             )}
+                            {/* Personal Notification Delete Button (For User) */}
+                            {isPersonalNotification && (
+                                <IconButton
+                                    {...props}
+                                    icon="delete-outline"
+                                    onPress={async () => {
+                                        if (!user) return;
+
+                                        const doDelete = async () => {
+                                            await deletePersonalNotification(user.id, item.id);
+                                            setSelectedAnnouncement(null);
+                                        };
+
+                                        if (Platform.OS === 'web') {
+                                            if (confirm('Bu bildirimi silmek istiyor musunuz?')) {
+                                                doDelete();
+                                            }
+                                        } else {
+                                            Alert.alert('Sil', 'Bu bildirimi silmek istiyor musunuz?', [
+                                                { text: 'İptal', style: 'cancel' },
+                                                {
+                                                    text: 'Sil',
+                                                    style: 'destructive',
+                                                    onPress: doDelete
+                                                }
+                                            ]);
+                                        }
+                                    }}
+                                    iconColor="#94a3b8"
+                                />
+                            )}
                         </View>
                     )}
                 />
@@ -262,9 +307,57 @@ export default function AnnouncementsScreen() {
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
             <View style={styles.header}>
-                <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
-                    Duyurular
-                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
+                        Duyurular
+                    </Text>
+                    {personalNotifications.length > 0 && (
+                        <Button
+                            mode="text"
+                            textColor="#ef4444"
+                            compact
+                            onPress={() => {
+                                const handleClearAll = async () => {
+                                    if (user) {
+                                        try {
+                                            const count = await deleteAllPersonalNotifications(user.id);
+                                            // Web'de alert yeterli, native'de Toast olabilir ama şimdilik alert
+                                            if (Platform.OS === 'web') {
+                                                alert(`${count} bildirim silindi.`);
+                                            } else {
+                                                Alert.alert('Başarılı', `${count} bildirim silindi.`);
+                                            }
+                                        } catch (e: any) {
+                                            console.error(e);
+                                            alert("Silme işlemi başarısız: " + e.message);
+                                        }
+                                    }
+                                };
+
+                                if (Platform.OS === 'web') {
+                                    if (confirm('Tüm kişisel bildirimleriniz ve eski mesajlarınız silinecek. Emin misiniz?')) {
+                                        handleClearAll();
+                                    }
+                                } else {
+                                    Alert.alert(
+                                        'Tümünü Temizle',
+                                        'Size özel tüm bildirimler ve eski takas mesajları silinecek. Emin misiniz?',
+                                        [
+                                            { text: 'Vazgeç', style: 'cancel' },
+                                            {
+                                                text: 'Evet, Hepsini Sil',
+                                                style: 'destructive',
+                                                onPress: handleClearAll
+                                            }
+                                        ]
+                                    );
+                                }
+                            }}
+                        >
+                            Tümünü Temizle
+                        </Button>
+                    )}
+                </View>
             </View>
 
             <FlatList
@@ -277,6 +370,11 @@ export default function AnnouncementsScreen() {
                         Henüz duyuru veya bildirim yok
                     </Text>
                 )}
+                refreshing={loading}
+                onRefresh={() => {
+                    // Force re-fetch logic if needed, but mainly visual for now or re-trigger subscriptions
+                    // Since it's onSnapshot, we can't 'refetch', but we can simulating it or check connection
+                }}
             />
 
             {isAdmin && (

@@ -10,7 +10,7 @@ import { subscribeToUsers } from '@/src/services/userService';
 import { subscribeToUnreadCount } from '@/src/services/chatService';
 import { subscribeToPendingRequests } from '@/src/services/requestService';
 import { subscribeToAnnouncements } from '@/src/services/announcementService';
-import { subscribeToSwapRequests } from '@/src/services/swapService';
+import { subscribeToSwapRequests, subscribeToAdminSwapRequests } from '@/src/services/swapService';
 import { subscribeToPersonalNotifications, getUnreadCount } from '@/src/services/personalNotificationService';
 import { Announcement } from '@/src/types';
 
@@ -77,6 +77,8 @@ export default function DrawerLayout() {
     const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
     const [pendingSwaps, setPendingSwaps] = useState(0);
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+    const [pendingAdminSwapsCount, setPendingAdminSwapsCount] = useState(0);
+    const [pendingUserRequestsCount, setPendingUserRequestsCount] = useState(0);
     const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
     const [unreadPersonalCount, setUnreadPersonalCount] = useState(0);
     const [lastPersonalNotificationTime, setLastPersonalNotificationTime] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export default function DrawerLayout() {
 
     // Calculate total notifications for the hamburger menu
     const totalNotifications = unreadMessagesCount + unreadAnnouncementsCount + unreadPersonalCount + pendingSwaps;
-    const totalRequestsBadge = pendingRequestsCount;
+    const totalRequestsBadge = pendingRequestsCount + pendingAdminSwapsCount + pendingUserRequestsCount;
 
     useEffect(() => {
         if (!user) return;
@@ -155,10 +157,26 @@ export default function DrawerLayout() {
     useEffect(() => {
         // Only fetch pending requests if admin
         if (isAdmin) {
-            const unsubscribe = subscribeToPendingRequests((requests) => {
+            const unsubRequests = subscribeToPendingRequests((requests) => {
                 setPendingRequestsCount(requests.length);
             });
-            return () => unsubscribe();
+
+            // Subscribe to pending SWAP requests for admin
+            const unsubSwaps = subscribeToAdminSwapRequests((swaps) => {
+                setPendingAdminSwapsCount(swaps.length);
+            });
+
+            // Subscribe to pending USER requests for admin
+            const unsubUsers = subscribeToUsers((users) => {
+                const pendingUsers = users.filter(u => !u.isApproved && u.role === 'user');
+                setPendingUserRequestsCount(pendingUsers.length);
+            });
+
+            return () => {
+                unsubRequests();
+                unsubSwaps();
+                unsubUsers();
+            };
         }
     }, [isAdmin]);
 

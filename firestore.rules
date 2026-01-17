@@ -27,14 +27,13 @@ service cloud.firestore {
                     || (isAdmin() && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])))
                     || request.auth.uid == userId;
       allow delete: if isAdmin();
-      
-      // Personal Notifications subcollection
-      // Any authenticated user can CREATE (for swap notifications)
-      // Only the owner can READ, UPDATE, DELETE
-      match /personalNotifications/{notificationId} {
-        allow create: if isSignedIn();
-        allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
-      }
+    }
+    
+    // Personal Notifications subcollection (Moved to top level for clarity)
+    match /users/{userId}/personalNotifications/{notificationId} {
+      allow create: if isSignedIn();
+      // Allow owner OR admin to read/write (admin access helps with support/debugging)
+      allow read, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Shifts
@@ -89,7 +88,20 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+
+    // System Metadata (Maintenance Tracking)
+    match /system/{documentId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+
     // === CHAT SİSTEMİ ===
+
+    // Collection Group Query Rule (for Admin Cleanup)
+    // Allows admins to query all 'messages' collections across all chats
+    match /{path=**}/messages/{messageId} {
+      allow read, delete: if isAdmin();
+    }
     
     // Sohbet Odaları
     match /chats/{roomId} {

@@ -9,10 +9,13 @@ import {
     collection,
     addDoc,
     query,
+    where,
     orderBy,
     onSnapshot,
     updateDoc,
     doc,
+    serverTimestamp,
+    deleteDoc,
     getDocs,
     writeBatch
 } from 'firebase/firestore';
@@ -74,6 +77,86 @@ export const subscribeToPersonalNotifications = (
         console.error('Error subscribing to personal notifications:', error);
         onUpdate([]);
     });
+};
+
+/**
+ * Bildirimi manuel olarak sil
+ */
+export const deletePersonalNotification = async (userId: string, notificationId: string) => {
+    const notifRef = doc(db, 'users', userId, 'personalNotifications', notificationId);
+    await deleteDoc(notifRef);
+};
+
+/**
+ * Süresi dolmuş (7 günden eski) takas bildirimlerini temizle
+ * NOT: Bu fonksiyon client-side'da çağrılacağı için sadece o anki aktif kullanıcı için çalışır.
+ * İdealde Cloud Function olmalıydı.
+ */
+export const cleanupExpiredNotifications = async (userId: string) => {
+    try {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const cutoffDate = oneWeekAgo.toISOString();
+
+        // Takas ile ilgili tipler
+        const swapTypes = ['swap_request', 'swap_approved', 'swap_rejected'];
+
+        // Firestore'da 'in' sorgusu limitlidir, bu yüzden basitçe tarih sorgusu yapıp memory'de filtreleyebiliriz
+        // veya query'i buna göre düzenleyebiliriz.
+        // Tarihi eski olanları çek
+        const q = query(
+            collection(db, 'users', userId, 'personalNotifications'),
+            where('createdAt', '<', cutoffDate)
+        );
+
+        const snapshot = await getDocs(q);
+
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Sadece takas ile ilgili olanları sil
+            if (data.type && swapTypes.includes(data.type)) {
+                batch.delete(doc.ref);
+                count++;
+            }
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            console.log(`${count} adet süresi dolmuş bildirim temizlendi.`);
+        }
+    } catch (error) {
+        console.error('Bildirim temizleme hatası:', error);
+    }
+};
+
+/**
+ * Kullanıcının TÜM kişisel bildirimlerini sil
+ */
+export const deleteAllPersonalNotifications = async (userId: string) => {
+    try {
+        const q = query(collection(db, 'users', userId, 'personalNotifications'));
+        const snapshot = await getDocs(q);
+
+        const batch = writeBatch(db);
+        let count = 0;
+
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+            count++;
+        });
+
+        if (count > 0) {
+            await batch.commit();
+            console.log(`${count} bildirim silindi.`);
+        }
+        return count;
+    } catch (error) {
+        console.error('Toplu silme hatası:', error);
+        throw error;
+    }
 };
 
 /**

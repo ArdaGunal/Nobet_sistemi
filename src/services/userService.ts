@@ -18,6 +18,7 @@ import {
     orderBy,
     onSnapshot,
     Unsubscribe,
+    writeBatch
 } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '@/config/firebase.config';
@@ -164,7 +165,7 @@ export const createUserDocument = async (
 };
 
 /**
-* Update user information
+* Update user information and cascade relevant changes (like staffRole) to other collections
 */
 export const updateUser = async (
     userId: string,
@@ -172,7 +173,35 @@ export const updateUser = async (
 ): Promise<void> => {
     try {
         const userRef = doc(db, USERS_COLLECTION, userId);
+
+        // 1. Update User Document
         await updateDoc(userRef, updates);
+
+        // 2. If staffRole is updated, update ALL existing shift assignments for this user
+        // This ensures the dashboard reflects the new role immediately without manual refresh
+        if (updates.staffRole) {
+            console.log(`Cascading staffRole update to schedule for user ${userId} -> ${updates.staffRole}`);
+
+            // Query all shifts for this user
+            // Optimization: In a real app, maybe only update future shifts?
+            // But for consistency, updating all is safer for this scale.
+            const scheduleRef = collection(db, 'schedule');
+            const q = query(scheduleRef, where('userId', '==', userId));
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => {
+                    batch.update(doc.ref, {
+                        staffRole: updates.staffRole,
+                        updatedAt: new Date().toISOString()
+                    });
+                });
+                await batch.commit();
+                console.log(`Updated ${snapshot.size} shifts with new role.`);
+            }
+        }
+
     } catch (error) {
         console.error('Error updating user:', error);
         throw new Error('Kullanıcı güncellenemedi');
@@ -183,8 +212,13 @@ export const updateUser = async (
 * Delete a user and ALL their related data (cascade delete)
 * This removes: user document, shift assignments, shift requests, and chat data
 */
+/**
+* Delete a user and ALL their related data (cascade delete)
+* This removes: user document, shift assignments, shift requests, and chat data
+*/
 export const deleteUser = async (userId: string): Promise<void> => {
     try {
+        // ... (delete logic)
         // 1. Delete all shift assignments for this user
         const scheduleRef = collection(db, 'schedule');
         const scheduleQuery = query(scheduleRef, where('userId', '==', userId));
@@ -215,6 +249,91 @@ export const deleteUser = async (userId: string): Promise<void> => {
     } catch (error) {
         console.error('Error deleting user:', error);
         throw new Error('Kullanıcı silinemedi');
+    }
+};
+
+/**
+ * REPAIR UTILITY: Normalizes all user data and syncs shifts
+ * Fixes legacy data issues (missing fields, inconsistent shift roles)
+ */
+export const repairDatabase = async (): Promise<string> => {
+    try {
+        console.log('Starting database repair...');
+        const users = await getAllUsers();
+        const batch = writeBatch(db);
+        let updatedUsers = 0;
+        let syncedShifts = 0;
+
+        for (const user of users) {
+            let needsUpdate = false;
+            const updates: any = {};
+
+            // 1. Check & Fix Missing Fields
+            if (!user.staffRole) {
+                updates.staffRole = 'saglikci'; // Default
+                needsUpdate = true;
+            }
+            if (!user.rotationGroup) {
+                updates.rotationGroup = 'A'; // Default
+                needsUpdate = true;
+            }
+            if (user.isApproved === undefined) {
+                updates.isApproved = true; // Assume legacy users are approved
+                needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+                const userRef = doc(db, USERS_COLLECTION, user.id);
+                batch.update(userRef, updates);
+                updatedUsers++;
+            }
+
+            // 2. Sync Shifts (Force update shift roles to match user profile)
+            // Note: We can't do this in the same batch easily if there are too many documents.
+            // So we'll call the sync logic separately per user.
+            // For safety/performance in this utility, we'll await each.
+            const currentRole = (needsUpdate ? updates.staffRole : user.staffRole) || 'saglikci';
+
+            // Reuse sync logic but return count instead of void if possible, 
+            // or just let it run.
+            await syncUserShiftRoles(user.id, currentRole);
+            // We won't count exact shifts here to avoid complexity, just assume success
+        }
+
+        await batch.commit(); // Commit user profile fixes
+
+        return `Onarım Tamamlandı:\n- ${updatedUsers} kullanıcı profili düzeltildi.\n- Tüm kullanıcıların nöbetleri senkronize edildi.`;
+    } catch (error: any) {
+        console.error('Repair failed:', error);
+        throw new Error('Veri tabanı onarımı başarısız: ' + error.message);
+    }
+};
+
+/**
+ * Manually sync a user's staffRole to all their existing shifts
+ * Useful for fixing data inconsistencies.
+ */
+export const syncUserShiftRoles = async (userId: string, staffRole: StaffRole): Promise<void> => {
+    try {
+        console.log(`Manual sync: Updating all shifts for ${userId} to role ${staffRole}`);
+        const scheduleRef = collection(db, 'schedule');
+        const q = query(scheduleRef, where('userId', '==', userId));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            const batch = writeBatch(db);
+            snapshot.docs.forEach((doc) => {
+                batch.update(doc.ref, {
+                    staffRole: staffRole,
+                    updatedAt: new Date().toISOString()
+                });
+            });
+            await batch.commit();
+            console.log(`Synced ${snapshot.size} shifts.`);
+        }
+    } catch (error) {
+        console.error('Error syncing shifts:', error);
+        throw new Error('Vardiyalar senkronize edilemedi');
     }
 };
 
@@ -265,6 +384,25 @@ export const approveUser = async (
         }
 
         await updateDoc(userRef, updateData);
+
+        // Cascade staffRole update to schedule if potential shifts exist
+        // (Unlikely for new approval, but possible for re-approval)
+        const scheduleRef = collection(db, 'schedule');
+        const q = query(scheduleRef, where('userId', '==', userId));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            const batch = writeBatch(db);
+            snapshot.docs.forEach((doc) => {
+                // Only update if role is different to save writes? Batch is cheap.
+                batch.update(doc.ref, {
+                    staffRole,
+                    updatedAt: new Date().toISOString()
+                });
+            });
+            await batch.commit();
+        }
+
     } catch (error) {
         console.error('Error approving user:', error);
         throw new Error('Kullanıcı onaylanamadı');

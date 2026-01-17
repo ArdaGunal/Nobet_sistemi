@@ -22,9 +22,12 @@ import { tr } from 'date-fns/locale';
 import { Calendar, Clock, User as UserIcon, Check } from 'lucide-react-native';
 
 import { useAuth } from '@/context/AuthContext';
-import { createShiftAssignment, deleteShiftAssignment, subscribeToDateRange } from '@/src/services/scheduleService';
+import { createShiftAssignment, deleteShiftAssignment, subscribeToDateRange, cleanupOldShifts } from '@/src/services/scheduleService';
 import { subscribeToUsers } from '@/src/services/userService';
 import { ShiftAssignment, User, ShiftSlot, StaffRole, SHIFT_SLOTS, STAFF_ROLES } from '@/src/types';
+import { cleanupSwapRequests } from '@/src/services/swapService';
+import { cleanupOldAnnouncements } from '@/src/services/announcementService';
+import { cleanupOldMessages } from '@/src/services/chatService';
 
 export default function AdminScreen() {
     const theme = useTheme();
@@ -64,10 +67,12 @@ export default function AdminScreen() {
         return { days, paddingDays };
     }, [currentMonth]);
 
+
     // Load users
     useEffect(() => {
         const unsubscribe = subscribeToUsers((data) => {
-            setUsers(data.filter(u => u.isApproved));
+            // Fix: Explicitly include admins/super_admins even if isApproved is undefined/false
+            setUsers(data.filter(u => u.isApproved || u.role === 'admin' || u.role === 'super_admin'));
             setUsersLoading(false);
         });
         return () => unsubscribe();
