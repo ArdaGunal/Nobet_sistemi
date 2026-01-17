@@ -69,7 +69,7 @@ export default function ProfileScreen() {
                         title="Uygulama Hakkında"
                         description="Nöbet Takip Sistemi v1.0. Acil Servis çalışanları için özel olarak geliştirilmiştir."
                         left={(props) => <List.Icon {...props} icon="information" />}
-                        onPress={() => alert('Nöbet Takip Sistemi\nGeliştirici: Arda Günal\nVersiyon: 1.0.0')}
+                        onPress={() => alert('Nöbet Takip Sistemi\nVersiyon: 1.0.0')}
                     />
                 </List.Section>
 
