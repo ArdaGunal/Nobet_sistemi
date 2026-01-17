@@ -94,11 +94,21 @@ export default function AnnouncementsScreen() {
     };
 
     // Kullanıcıya gösterilecek duyuruları filtrele
+    // Kullanıcıya gösterilecek duyuruları filtrele
     const filteredAnnouncements = announcements.filter(item => {
-        // Genel duyurular (targetUserId yok)
-        if (!item.targetUserId) return true;
-        // Kişiye özel bildirimler (sadece o kullanıcıya)
-        return item.targetUserId === user?.id;
+        // 1. targetUserId varsa, sadece ilgili kullanıcıya göster
+        if (item.targetUserId) {
+            return item.targetUserId === user?.id;
+        }
+
+        // 2. targetUserId YOKSA:
+        // Eğer notificationType varsa (swap vb.), bu bir hatadır/eski kayıttır -> GÖSTERME
+        if (item.notificationType) {
+            return false;
+        }
+
+        // 3. targetUserId yok ve notificationType yok -> GENEL DUYURU
+        return true;
     });
 
     const renderItem = ({ item }: { item: Announcement }) => {

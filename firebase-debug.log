@@ -1,0 +1,16 @@
+[debug] [2026-01-17T12:10:46.547Z] ----------------------------------------------------------------------
+[debug] [2026-01-17T12:10:46.555Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\ardag\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting
+[debug] [2026-01-17T12:10:46.555Z] CLI Version:   15.3.1
+[debug] [2026-01-17T12:10:46.556Z] Platform:      win32
+[debug] [2026-01-17T12:10:46.556Z] Node Version:  v24.11.1
+[debug] [2026-01-17T12:10:46.556Z] Time:          Sat Jan 17 2026 15:10:46 GMT+0300 (GMT+03:00)
+[debug] [2026-01-17T12:10:46.557Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-01-17T12:10:51.346Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-17T12:10:51.349Z] > authorizing via signed-in user (isd112sm@gmail.com)
+[debug] [2026-01-17T12:10:51.349Z] [iam] checking project isd112 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-01-17T12:10:51.352Z] Checked if tokens are valid: true, expires at: 1768653832101
+[debug] [2026-01-17T12:10:51.352Z] Checked if tokens are valid: true, expires at: 1768653832101
+[debug] [2026-01-17T12:10:51.354Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/isd112:testIamPermissions [none]
+[debug] [2026-01-17T12:10:51.354Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/isd112:testIamPermissions x-goog-quota-user=projects/isd112
+[debug] [2026-01-17T12:10:51.355Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/isd112:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}

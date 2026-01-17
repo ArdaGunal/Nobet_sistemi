@@ -100,9 +100,21 @@ export default function DrawerLayout() {
             // Only count announcements visible to this user:
             // 1. General announcements (no targetUserId)
             // 2. Personal notifications for this user (targetUserId === user.id)
-            const visibleAnnouncements = data.filter(a =>
-                !a.targetUserId || a.targetUserId === user.id
-            );
+            const visibleAnnouncements = data.filter(a => {
+                // 1. If targetUserId exists, only show to that user
+                if (a.targetUserId) {
+                    return a.targetUserId === user.id;
+                }
+
+                // 2. If targetUserId is MISSING:
+                // If it has a notificationType (swap, system, etc.), it's a bugged/legacy record -> HIDE IT
+                if (a.notificationType) {
+                    return false;
+                }
+
+                // 3. No targetUserId and no notificationType -> General Announcement -> SHOW
+                return true;
+            });
             const unread = visibleAnnouncements.filter(a => !a.readBy?.includes(user.id));
             setUnreadAnnouncementsCount(unread.length);
 
