@@ -11,6 +11,7 @@ import { subscribeToUnreadCount } from '@/src/services/chatService';
 import { subscribeToPendingRequests } from '@/src/services/requestService';
 import { subscribeToAnnouncements } from '@/src/services/announcementService';
 import { subscribeToSwapRequests } from '@/src/services/swapService';
+import { subscribeToPersonalNotifications, getUnreadCount } from '@/src/services/personalNotificationService';
 import { Announcement } from '@/src/types';
 
 // Badge component for drawer icons
@@ -77,13 +78,15 @@ export default function DrawerLayout() {
     const [pendingSwaps, setPendingSwaps] = useState(0);
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
+    const [unreadPersonalCount, setUnreadPersonalCount] = useState(0);
+    const [lastPersonalNotificationTime, setLastPersonalNotificationTime] = useState<string | null>(null);
 
     // Snackbar for new announcements
     const [snackbarVisible, setSnackbarVisible] = useState(false);
     const [lastAnnouncementTitle, setLastAnnouncementTitle] = useState('');
 
     // Calculate total notifications for the hamburger menu
-    const totalNotifications = unreadMessagesCount + unreadAnnouncementsCount + pendingSwaps;
+    const totalNotifications = unreadMessagesCount + unreadAnnouncementsCount + unreadPersonalCount + pendingSwaps;
     const totalRequestsBadge = pendingRequestsCount;
 
     useEffect(() => {
@@ -97,35 +100,42 @@ export default function DrawerLayout() {
         // Announcement notification
         let isFirstLoad = true;
         const unsubAnnounce = subscribeToAnnouncements((data) => {
-            // Only count announcements visible to this user:
-            // 1. General announcements (no targetUserId)
-            // 2. Personal notifications for this user (targetUserId === user.id)
-            const visibleAnnouncements = data.filter(a => {
-                // 1. If targetUserId exists, only show to that user
-                if (a.targetUserId) {
-                    return a.targetUserId === user.id;
-                }
+            // Only count GENERAL announcements (no targetUserId and no notificationType)
+            const generalAnnouncements = data.filter(a => !a.targetUserId && !a.notificationType);
+            const unreadGeneral = generalAnnouncements.filter(a => !a.readBy?.includes(user.id));
 
-                // 2. If targetUserId is MISSING:
-                // If it has a notificationType (swap, system, etc.), it's a bugged/legacy record -> HIDE IT
-                if (a.notificationType) {
-                    return false;
-                }
-
-                // 3. No targetUserId and no notificationType -> General Announcement -> SHOW
-                return true;
+            // Note: We'll combine this count with personal notifications in a separate effect or state
+            // For now, let's keep using the state variable but rename logic slightly
+            setUnreadAnnouncementsCount(prev => {
+                // This is tricky because we have two subscriptions updating one number.
+                // Better approach: Separate states.
+                return unreadGeneral.length;
             });
-            const unread = visibleAnnouncements.filter(a => !a.readBy?.includes(user.id));
-            setUnreadAnnouncementsCount(unread.length);
 
-            if (unread.length > 0) {
-                const latest = unread[0];
+            if (unreadGeneral.length > 0) {
+                const latest = unreadGeneral[0];
                 if (isFirstLoad || latest.title !== lastAnnouncementTitle) {
                     setLastAnnouncementTitle(latest.title);
                     setSnackbarVisible(true);
                 }
             }
             isFirstLoad = false;
+        });
+
+        // Subscribe to Personal Notifications (User Subcollection)
+        const unsubPersonal = subscribeToPersonalNotifications(user.id, (notes) => {
+            const unreadPersonal = getUnreadCount(notes);
+            setUnreadPersonalCount(unreadPersonal);
+
+            if (unreadPersonal > 0 && notes.length > 0) {
+                // Show snackbar for new personal notification
+                // Ideally check if it's new, but for now simple check
+                const latest = notes[0];
+                if (latest.createdAt > (lastPersonalNotificationTime || '')) {
+                    setLastPersonalNotificationTime(latest.createdAt);
+                    setSnackbarVisible(true);
+                }
+            }
         });
 
         // Subscribe to swap requests
@@ -137,9 +147,10 @@ export default function DrawerLayout() {
         return () => {
             if (typeof unsubChat === 'function') unsubChat();
             unsubAnnounce();
+            unsubPersonal();
             unsubscribeSwaps();
         };
-    }, [user, lastAnnouncementTitle]);
+    }, [user, lastAnnouncementTitle, lastPersonalNotificationTime]);
 
     useEffect(() => {
         // Only fetch pending requests if admin

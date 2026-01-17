@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
 import { SwapRequest, ShiftAssignment, User, SwapStatus, SHIFT_SLOTS } from '../types';
-import { createPersonalNotification } from './announcementService';
+import { createPersonalNotification } from './personalNotificationService';
 
 const SWAP_COLLECTION = 'swap_requests';
 const SCHEDULE_COLLECTION = 'schedule';

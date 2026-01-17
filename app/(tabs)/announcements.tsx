@@ -7,12 +7,14 @@ import { tr } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext';
 import { Announcement } from '@/src/types';
 import { createAnnouncement, deleteAnnouncement, subscribeToAnnouncements, markAnnouncementAsRead } from '@/src/services/announcementService';
+import { subscribeToPersonalNotifications, markNotificationAsRead as markPersonalAsRead, PersonalNotification } from '@/src/services/personalNotificationService';
 
 export default function AnnouncementsScreen() {
     const theme = useTheme();
     const { user, isAdmin } = useAuth();
 
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [personalNotifications, setPersonalNotifications] = useState<PersonalNotification[]>([]);
     const [createVisible, setCreateVisible] = useState(false);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
     const [loading, setLoading] = useState(false);
@@ -29,22 +31,28 @@ export default function AnnouncementsScreen() {
         return () => unsubscribe();
     }, []);
 
-    // Auto-mark swap notifications as read when user opens this page
+    // Subscribe to Personal Notifications
     useEffect(() => {
-        if (!user || announcements.length === 0) return;
-
-        const swapNotifications = announcements.filter(a =>
-            a.targetUserId === user.id &&
-            a.notificationType &&
-            (a.notificationType === 'swap_approved' || a.notificationType === 'swap_rejected') &&
-            !a.readBy?.includes(user.id)
-        );
-
-        // Mark each swap notification as read
-        swapNotifications.forEach(notification => {
-            markAnnouncementAsRead(notification.id, user.id);
+        if (!user) return;
+        const unsub = subscribeToPersonalNotifications(user.id, (data) => {
+            setPersonalNotifications(data);
         });
-    }, [announcements, user]);
+        return () => unsub();
+    }, [user]);
+
+    // Auto-mark swap notifications as read (Both types)
+    useEffect(() => {
+        if (!user) return;
+
+        // 1. Personal Notifications
+        const unreadPersonalSwap = personalNotifications.filter(n =>
+            !n.isRead && (n.type === 'swap_approved' || n.type === 'swap_rejected')
+        );
+        unreadPersonalSwap.forEach(n => markPersonalAsRead(user.id, n.id));
+
+        // 2. Legacy/General Announcements (if any matched)
+        // ... (Code below handles this part, but we can verify)
+    }, [personalNotifications, user]);
 
     const handleCreate = async () => {
         if (!title || !content || !user) return;
@@ -75,7 +83,25 @@ export default function AnnouncementsScreen() {
     };
 
     const handleMarkAsRead = async (announcement: Announcement) => {
-        if (!user || !announcement || announcement.readBy?.includes(user.id)) return;
+        if (!user || !announcement) return;
+
+        // Check if it's a personal notification
+        const isPersonal = personalNotifications.some(n => n.id === announcement.id);
+
+        if (isPersonal) {
+            if (announcement.readBy?.includes(user.id)) return;
+            try {
+                await markPersonalAsRead(user.id, announcement.id);
+                // Local state is updated via subscription
+                setSelectedAnnouncement(null);
+            } catch (error) {
+                console.error(error);
+            }
+            return;
+        }
+
+        // General Announcement
+        if (announcement.readBy?.includes(user.id)) return;
 
         try {
             await markAnnouncementAsRead(announcement.id, user.id);
@@ -110,6 +136,25 @@ export default function AnnouncementsScreen() {
         // 3. targetUserId yok ve notificationType yok -> GENEL DUYURU
         return true;
     });
+
+    // Merge and Sort
+    const combinedList = [
+        ...filteredAnnouncements,
+        ...personalNotifications.map(n => ({
+            id: n.id,
+            title: n.title,
+            content: n.content,
+            priority: 'normal' as const,
+            createdAt: n.createdAt,
+            createdBy: 'system',
+            creatorName: 'Sistem',
+            readBy: n.isRead ? [user?.id || ''] : [],
+            targetUserId: user?.id,
+            notificationType: n.type,
+            notificationColor: n.color,
+            isActive: true
+        } as Announcement))
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const renderItem = ({ item }: { item: Announcement }) => {
         const isRead = item.readBy?.includes(user?.id || '');
@@ -223,16 +268,15 @@ export default function AnnouncementsScreen() {
             </View>
 
             <FlatList
-                data={filteredAnnouncements}
+                data={combinedList}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Avatar.Icon size={64} icon="bullhorn-outline" style={{ backgroundColor: '#f1f5f9' }} color="#94a3b8" />
-                        <Text style={{ marginTop: 16, color: '#94a3b8' }}>Henüz duyuru yok</Text>
-                    </View>
-                }
+                contentContainerStyle={{ padding: 16 }}
+                ListEmptyComponent={() => (
+                    <Text style={{ textAlign: 'center', marginTop: 20, color: '#64748b' }}>
+                        Henüz duyuru veya bildirim yok
+                    </Text>
+                )}
             />
 
             {isAdmin && (

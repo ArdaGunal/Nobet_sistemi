@@ -27,6 +27,14 @@ service cloud.firestore {
                     || (isAdmin() && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])))
                     || request.auth.uid == userId;
       allow delete: if isAdmin();
+      
+      // Personal Notifications subcollection
+      // Any authenticated user can CREATE (for swap notifications)
+      // Only the owner can READ, UPDATE, DELETE
+      match /personalNotifications/{notificationId} {
+        allow create: if isSignedIn();
+        allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // Shifts
