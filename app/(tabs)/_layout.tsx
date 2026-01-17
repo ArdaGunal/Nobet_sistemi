@@ -74,7 +74,6 @@ export default function DrawerLayout() {
     const drawerWidth = 280;
 
     const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
-    const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
     const [pendingSwaps, setPendingSwaps] = useState(0);
     const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
     const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
@@ -111,10 +110,8 @@ export default function DrawerLayout() {
                 const latest = unread[0];
                 if (isFirstLoad || latest.title !== lastAnnouncementTitle) {
                     setLastAnnouncementTitle(latest.title);
-                    setUnreadAnnouncements(unread.length);
+                    setSnackbarVisible(true);
                 }
-            } else {
-                setUnreadAnnouncements(0);
             }
             isFirstLoad = false;
         });
@@ -306,7 +303,7 @@ export default function DrawerLayout() {
             </Drawer>
 
             <Snackbar
-                visible={snackbarVisible && (unreadAnnouncements > 0 || pendingSwaps > 0)}
+                visible={snackbarVisible && (unreadAnnouncementsCount > 0 || pendingSwaps > 0)}
                 onDismiss={() => setSnackbarVisible(false)}
                 duration={5000}
                 action={{
