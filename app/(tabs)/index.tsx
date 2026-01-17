@@ -43,7 +43,7 @@ export default function DashboardScreen() {
     const [requestModalVisible, setRequestModalVisible] = useState(false);
     const [modalStep, setModalStep] = useState<'select' | 'action'>('select');
     const [selectedShift, setSelectedShift] = useState<ShiftAssignment | null>(null);
-    const [requestType, setRequestType] = useState<'move' | 'cancel' | 'swap'>('cancel');
+    const [requestType, setRequestType] = useState<'cancel' | 'swap'>('cancel');
     const [swapTargetShift, setSwapTargetShift] = useState<ShiftAssignment | null>(null);
     const [availableSwapShifts, setAvailableSwapShifts] = useState<ShiftAssignment[]>([]);
     const [targetDate, setTargetDate] = useState<Date>(new Date());
@@ -219,20 +219,7 @@ export default function DashboardScreen() {
                     selectedShift.shiftSlot,
                     undefined
                 );
-            } else if (requestType === 'move') {
-                message = `${format(new Date(selectedShift.date), 'd MMMM', { locale: tr })} ${slotLabel} vardiyamı ${format(targetDate, 'd MMMM', { locale: tr })} tarihine taşımak istiyorum${requestMessage ? '. Sebep: ' + requestMessage : ''}`;
 
-                await createRequest(
-                    user.id,
-                    user.fullName,
-                    user.staffRole,
-                    'preference',
-                    selectedShift.date,
-                    message,
-                    action,
-                    selectedShift.shiftSlot,
-                    format(targetDate, 'yyyy-MM-dd')
-                );
             } else if (requestType === 'swap') {
                 if (!swapTargetShift) {
                     alert('Lütfen takas yapacağınız kişiyi seçin.');
@@ -524,15 +511,6 @@ export default function DashboardScreen() {
                                     >
                                         İptal Et
                                     </Button>
-                                    <Button
-                                        mode={requestType === 'move' ? 'contained' : 'outlined'}
-                                        onPress={() => setRequestType('move')}
-                                        style={[styles.actionButton, requestType === 'move' && { backgroundColor: '#3b82f6' }]}
-                                        icon="swap-horizontal"
-                                        compact
-                                    >
-                                        Başka Güne Taşı
-                                    </Button>
                                 </View>
                                 <Button
                                     mode={requestType === 'swap' ? 'contained' : 'outlined'}
@@ -544,11 +522,11 @@ export default function DashboardScreen() {
                                     Takas Et
                                 </Button>
 
-                                {/* Target Date Selector (for move and swap) */}
-                                {(requestType === 'move' || requestType === 'swap') && (
+                                {/* Target Date Selector (for swap) */}
+                                {requestType === 'swap' && (
                                     <>
                                         <Text variant="labelLarge" style={{ marginBottom: 8, marginTop: 16 }}>
-                                            {requestType === 'move' ? 'Hangi tarihe taşınsın?' : 'Takas yapılacak tarih?'}
+                                            Takas yapılacak tarih?
                                         </Text>
                                         <View style={styles.dateSelectorContainer}>
                                             <Button
@@ -648,7 +626,7 @@ export default function DashboardScreen() {
                                         disabled={submitting}
                                         style={{ flex: 1, marginLeft: 12, backgroundColor: requestType === 'cancel' ? '#ef4444' : '#3b82f6' }}
                                     >
-                                        {requestType === 'cancel' ? 'İptal İste' : 'Taşıma İste'}
+                                        {requestType === 'cancel' ? 'İptal İste' : 'Takas İste'}
                                     </Button>
                                 </View>
                             </>
