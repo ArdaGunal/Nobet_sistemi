@@ -71,6 +71,15 @@ export default function RequestsScreen() {
     const [selectedStaffRole, setSelectedStaffRole] = useState<StaffRole>('saglikci');
     const [selectedRotationGroup, setSelectedRotationGroup] = useState<RotationGroup>('A');
 
+
+
+    // Custom Confirmation Overlay State
+    const [confirmState, setConfirmState] = useState<{
+        visible: boolean;
+        type: 'approved' | 'rejected';
+        request: ShiftRequest | null;
+    }>({ visible: false, type: 'approved', request: null });
+
     const [approving, setApproving] = useState(false);
 
 
@@ -118,6 +127,22 @@ export default function RequestsScreen() {
         setSelectedRequest(request);
         setAdminResponse('');
         setModalVisible(true);
+    };
+
+    const initiateResponse = (request: ShiftRequest, type: 'approved' | 'rejected') => {
+        setConfirmState({ visible: true, type, request });
+    };
+
+    const confirmAction = async () => {
+        if (!confirmState.request) return;
+
+        const req = confirmState.request;
+        const type = confirmState.type;
+
+        // Modal'ı kapat
+        setConfirmState(prev => ({ ...prev, visible: false }));
+
+        await handleResponse(req, type);
     };
 
     const handleResponse = async (request: ShiftRequest, status: 'approved' | 'rejected') => {
@@ -341,26 +366,7 @@ export default function RequestsScreen() {
                         <Button
                             mode="outlined"
                             textColor={theme.colors.error}
-                            onPress={() => {
-                                if (Platform.OS === 'web') {
-                                    if (confirm('Bu isteği reddetmek istediğinize emin misiniz?')) {
-                                        setSelectedRequest(item);
-                                        handleResponse(item, 'rejected');
-                                    }
-                                } else {
-                                    Alert.alert('Reddet', 'Emin misiniz?', [
-                                        { text: 'İptal', style: 'cancel' },
-                                        {
-                                            text: 'Reddet',
-                                            style: 'destructive',
-                                            onPress: () => {
-                                                setSelectedRequest(item);
-                                                handleResponse(item, 'rejected');
-                                            }
-                                        }
-                                    ]);
-                                }
-                            }}
+                            onPress={() => initiateResponse(item, 'rejected')}
                             style={{ width: '100%' }}
                         >
                             Reddet
@@ -369,10 +375,7 @@ export default function RequestsScreen() {
                     <AppTooltip title="İsteği Onayla" style={{ flex: 1 }}>
                         <Button
                             mode="contained"
-                            onPress={() => {
-                                setSelectedRequest(item);
-                                handleResponse(item, 'approved');
-                            }}
+                            onPress={() => initiateResponse(item, 'approved')}
                             style={{ width: '100%' }}
                         >
                             Onayla
@@ -501,6 +504,40 @@ export default function RequestsScreen() {
                     )}
                 </>
             )}
+
+            {/* CUSTOM CONFIRMATION OVERLAY */}
+            {confirmState.visible && (
+                <View style={styles.overlay}>
+                    <View style={styles.confirmBox}>
+                        <Text variant="titleLarge" style={{ textAlign: 'center', marginBottom: 8, fontWeight: 'bold' }}>
+                            {confirmState.type === 'approved' ? 'İsteği Onayla' : 'İsteği Reddet'}
+                        </Text>
+                        <Text style={{ textAlign: 'center', color: '#555', marginBottom: 20 }}>
+                            {confirmState.type === 'approved'
+                                ? 'Bu işlemi onaylamak üzeresiniz. Vardiya durumu güncellenecektir.'
+                                : 'Bu isteği reddetmek üzeresiniz. Emin misiniz?'}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.confirmBtn, { backgroundColor: '#f3f4f6' }]}
+                                onPress={() => setConfirmState(p => ({ ...p, visible: false }))}
+                            >
+                                <Text style={{ fontWeight: 'bold', color: '#374151' }}>İptal</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.confirmBtn, { backgroundColor: confirmState.type === 'approved' ? '#22c55e' : '#ef4444' }]}
+                                onPress={confirmAction}
+                            >
+                                <Text style={{ color: 'white', fontWeight: 'bold' }}>
+                                    {confirmState.type === 'approved' ? 'Evet, Onayla' : 'Evet, Reddet'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            )}
         </View>
     );
 }
@@ -621,4 +658,34 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
     },
+    // Overlay Styles
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999
+    },
+    confirmBox: {
+        backgroundColor: 'white',
+        padding: 24,
+        borderRadius: 16,
+        width: '90%',
+        maxWidth: 400,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5
+    },
+    confirmBtn: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center'
+    }
 });
