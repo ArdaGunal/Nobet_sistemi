@@ -155,7 +155,19 @@ export default function AnnouncementsScreen() {
                     right={(props) => (
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             {!isRead && (
-                                <Chip compact style={{ marginRight: 8, height: 24, backgroundColor: theme.colors.primaryContainer }} textStyle={{ fontSize: 10, lineHeight: 12 }}>Yeni</Chip>
+                                <>
+                                    <Chip compact style={{ marginRight: 4, height: 24, backgroundColor: theme.colors.primaryContainer }} textStyle={{ fontSize: 10, lineHeight: 12 }}>Yeni</Chip>
+                                    <IconButton
+                                        icon="check"
+                                        size={18}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            user && markAnnouncementAsRead(item.id, user.id);
+                                        }}
+                                        iconColor="#22c55e"
+                                        style={{ margin: 0, marginRight: 4 }}
+                                    />
+                                </>
                             )}
                             {isAdmin && !isPersonalNotification && (
                                 <IconButton {...props} icon="delete" onPress={() => handleDelete(item.id)} iconColor="#ef4444" />
