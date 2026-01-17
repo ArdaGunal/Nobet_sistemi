@@ -88,39 +88,89 @@ export default function AnnouncementsScreen() {
         setPriority('normal');
     };
 
+    // Kullanıcıya gösterilecek duyuruları filtrele
+    const filteredAnnouncements = announcements.filter(item => {
+        // Genel duyurular (targetUserId yok)
+        if (!item.targetUserId) return true;
+        // Kişiye özel bildirimler (sadece o kullanıcıya)
+        return item.targetUserId === user?.id;
+    });
+
     const renderItem = ({ item }: { item: Announcement }) => {
         const isRead = item.readBy?.includes(user?.id || '');
         const isUrgent = item.priority === 'urgent';
+        const isPersonalNotification = !!item.notificationType;
+
+        // Renk belirleme
+        const getBorderColor = () => {
+            if (item.notificationColor === 'green') return '#22c55e';
+            if (item.notificationColor === 'red') return '#ef4444';
+            if (isUrgent) return '#ef4444';
+            return undefined;
+        };
+
+        const getIconColor = () => {
+            if (item.notificationColor === 'green') return '#22c55e';
+            if (item.notificationColor === 'red') return '#ef4444';
+            if (isUrgent) return '#ef4444';
+            return '#64748b';
+        };
+
+        const getIconBgColor = () => {
+            if (item.notificationColor === 'green') return '#dcfce7';
+            if (item.notificationColor === 'red') return '#fee2e2';
+            if (isUrgent) return '#fee2e2';
+            return '#f1f5f9';
+        };
 
         return (
             <Card
                 style={[
                     styles.card,
-                    isUrgent && { borderColor: '#ef4444', borderWidth: 1 }
+                    getBorderColor() && { borderColor: getBorderColor(), borderWidth: 2 }
                 ]}
                 onPress={() => setSelectedAnnouncement(item)}
             >
                 <Card.Title
                     title={item.title}
-                    titleStyle={!isRead ? { fontWeight: 'bold' } : undefined}
+                    titleStyle={[
+                        !isRead && { fontWeight: 'bold' },
+                        item.notificationColor === 'green' && { color: '#16a34a' },
+                        item.notificationColor === 'red' && { color: '#dc2626' }
+                    ]}
                     subtitle={`${item.creatorName} • ${format(new Date(item.createdAt), 'd MMM HH:mm', { locale: tr })}`}
-                    left={(props) => <Avatar.Icon {...props} icon="bullhorn" style={{ backgroundColor: isUrgent ? '#fee2e2' : '#f1f5f9' }} color={isUrgent ? '#ef4444' : '#64748b'} />}
+                    left={(props) => (
+                        <Avatar.Icon
+                            {...props}
+                            icon={isPersonalNotification ? (item.notificationColor === 'green' ? 'check-circle' : 'close-circle') : 'bullhorn'}
+                            style={{ backgroundColor: getIconBgColor() }}
+                            color={getIconColor()}
+                        />
+                    )}
                     right={(props) => (
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             {!isRead && (
-                                <Chip compact style={{ marginRight: 8, height: 24, backgroundColor: theme.colors.primaryContainer }} textStyle={{ fontSize: 10, lineHeight: 12 }}>Okunmadı</Chip>
+                                <Chip compact style={{ marginRight: 8, height: 24, backgroundColor: theme.colors.primaryContainer }} textStyle={{ fontSize: 10, lineHeight: 12 }}>Yeni</Chip>
                             )}
-                            {isAdmin && (
+                            {isAdmin && !isPersonalNotification && (
                                 <IconButton {...props} icon="delete" onPress={() => handleDelete(item.id)} iconColor="#ef4444" />
                             )}
                         </View>
                     )}
                 />
                 <Card.Content>
-                    <Text variant="bodyMedium" numberOfLines={2} style={!isRead ? { fontWeight: '500' } : undefined}>
+                    <Text
+                        variant="bodyMedium"
+                        numberOfLines={2}
+                        style={[
+                            !isRead && { fontWeight: '500' },
+                            item.notificationColor === 'green' && { color: '#16a34a' },
+                            item.notificationColor === 'red' && { color: '#dc2626' }
+                        ]}
+                    >
                         {item.content}
                     </Text>
-                    {isUrgent && (
+                    {isUrgent && !isPersonalNotification && (
                         <Chip
                             icon="alert-circle"
                             style={{ alignSelf: 'flex-start', marginTop: 12, backgroundColor: '#fee2e2' }}
@@ -161,7 +211,7 @@ export default function AnnouncementsScreen() {
             {/* Content based on active tab */}
             {activeTab === 'announcements' ? (
                 <FlatList
-                    data={announcements}
+                    data={filteredAnnouncements}
                     renderItem={renderItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}

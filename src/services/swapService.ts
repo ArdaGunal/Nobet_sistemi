@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../config/firebase.config';
 import { SwapRequest, ShiftAssignment, User, SwapStatus, SHIFT_SLOTS } from '../types';
-import { createNotification } from './notificationService';
+import { createPersonalNotification } from './announcementService';
 
 const SWAP_COLLECTION = 'swap_requests';
 const SCHEDULE_COLLECTION = 'schedule';
@@ -142,11 +142,11 @@ export const respondToSwapRequest = async (requestId: string, approve: boolean, 
     // Eğer reddedildiyse bildirimi gönder
     if (!approve && swapRequest) {
         const slotInfo = SHIFT_SLOTS.find(s => s.id === swapRequest.requesterSlot);
-        await createNotification(
+        await createPersonalNotification(
             swapRequest.requesterId,
-            'swap_rejected',
             'Takas Talebi Reddedildi',
             `Vardiya takas talebiniz, nöbet planlaması uygunluğu sağlanamadığı için onaylanmamıştır.`,
+            'swap_rejected',
             'red'
         );
     }
@@ -201,11 +201,11 @@ export const approveSwapByAdmin = async (swapRequest: SwapRequest) => {
 
     // Bildirim gönder (transaction dışında)
     const slotInfo = SHIFT_SLOTS.find(s => s.id === swapRequest.targetSlot);
-    await createNotification(
+    await createPersonalNotification(
         swapRequest.requesterId,
-        'swap_approved',
         'Nöbet Takasınız Onaylandı',
         `Nöbet takasınız onaylanmıştır. Yeni nöbetiniz: ${swapRequest.targetDate} tarihinde ${slotInfo?.labelTr || swapRequest.targetSlot} vardiyası.`,
+        'swap_approved',
         'green'
     );
 };
@@ -222,11 +222,11 @@ export const rejectSwapByAdmin = async (requestId: string, swapRequest?: SwapReq
 
     // Bildirim gönder
     if (swapRequest) {
-        await createNotification(
+        await createPersonalNotification(
             swapRequest.requesterId,
-            'swap_rejected',
             'Takas Talebi Reddedildi',
             `Vardiya takas talebiniz, nöbet planlaması uygunluğu sağlanamadığı için onaylanmamıştır.`,
+            'swap_rejected',
             'red'
         );
     }

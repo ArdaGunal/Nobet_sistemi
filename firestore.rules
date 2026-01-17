@@ -52,7 +52,12 @@ service cloud.firestore {
     // Announcements (duyurular)
     match /announcements/{announcementId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin();
+      // Admin her türlü duyuru oluşturabilir
+      // Normal kullanıcılar sadece system notification (takas bildirimleri) oluşturabilir
+      allow create: if isAdmin() || (isSignedIn() && 
+        request.resource.data.createdBy == 'system' &&
+        request.resource.data.notificationType in ['swap_approved', 'swap_rejected', 'system']
+      );
       allow delete: if isAdmin();
       // Allow update if admin OR if regular user is just marking as read (title/content/priority don't change)
       allow update: if isAdmin() || (isSignedIn() && 

@@ -44,6 +44,36 @@ export const createAnnouncement = async (
 };
 
 /**
+ * Create a personal notification (shown in announcements for specific user)
+ */
+export const createPersonalNotification = async (
+    targetUserId: string,
+    title: string,
+    content: string,
+    notificationType: 'swap_approved' | 'swap_rejected' | 'system',
+    notificationColor: 'green' | 'red' | 'blue' = 'blue'
+): Promise<void> => {
+    try {
+        await addDoc(collection(db, ANNOUNCEMENTS_COLLECTION), {
+            title,
+            content,
+            createdBy: 'system',
+            creatorName: 'Sistem',
+            priority: 'normal',
+            isActive: true,
+            readBy: [],
+            targetUserId,
+            notificationType,
+            notificationColor,
+            createdAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Error creating personal notification:', error);
+        // Bildirim oluşturulamazsa ana işlemi durdurmayalım
+    }
+};
+
+/**
  * Mark announcement as read by user
  */
 export const markAnnouncementAsRead = async (announcementId: string, userId: string): Promise<void> => {

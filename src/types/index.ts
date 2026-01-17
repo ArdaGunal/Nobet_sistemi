@@ -192,6 +192,10 @@ export interface Announcement {
     priority: 'normal' | 'urgent';
     isActive: boolean;
     readBy: string[]; // List of user IDs who read the announcement
+    // Kişiye özel bildirimler için
+    targetUserId?: string;           // Sadece bu kullanıcıya göster
+    notificationType?: 'swap_approved' | 'swap_rejected' | 'system';
+    notificationColor?: 'green' | 'red' | 'blue';
 }
 
 // Kişiye özel bildirim tipi
