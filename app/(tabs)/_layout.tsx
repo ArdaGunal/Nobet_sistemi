@@ -98,7 +98,13 @@ export default function DrawerLayout() {
         // Announcement notification
         let isFirstLoad = true;
         const unsubAnnounce = subscribeToAnnouncements((data) => {
-            const unread = data.filter(a => !a.readBy?.includes(user.id));
+            // Only count announcements visible to this user:
+            // 1. General announcements (no targetUserId)
+            // 2. Personal notifications for this user (targetUserId === user.id)
+            const visibleAnnouncements = data.filter(a =>
+                !a.targetUserId || a.targetUserId === user.id
+            );
+            const unread = visibleAnnouncements.filter(a => !a.readBy?.includes(user.id));
             setUnreadAnnouncementsCount(unread.length);
 
             if (unread.length > 0) {

@@ -29,6 +29,23 @@ export default function AnnouncementsScreen() {
         return () => unsubscribe();
     }, []);
 
+    // Auto-mark swap notifications as read when user opens this page
+    useEffect(() => {
+        if (!user || announcements.length === 0) return;
+
+        const swapNotifications = announcements.filter(a =>
+            a.targetUserId === user.id &&
+            a.notificationType &&
+            (a.notificationType === 'swap_approved' || a.notificationType === 'swap_rejected') &&
+            !a.readBy?.includes(user.id)
+        );
+
+        // Mark each swap notification as read
+        swapNotifications.forEach(notification => {
+            markAnnouncementAsRead(notification.id, user.id);
+        });
+    }, [announcements, user]);
+
     const handleCreate = async () => {
         if (!title || !content || !user) return;
 
